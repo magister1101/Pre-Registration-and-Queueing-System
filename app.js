@@ -4,9 +4,12 @@ const morgan = require('morgan');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const dotenv = require('dotenv').config();
+
 
 //routes link
-
+const userRoutes = require('./api/routes/users');
+const courseRoutes = require('./api/routes/courses');
 
 
 mongoose.connect('mongodb+srv://admin:adminPassword@cluster0.oxixb.mongodb.net/');
@@ -42,6 +45,8 @@ app.use((req, res, next) => {
 
 
 // routes
+app.use('/users', userRoutes);
+app.use('/courses', courseRoutes);
 
 
 app.use((req, res, next) => {
