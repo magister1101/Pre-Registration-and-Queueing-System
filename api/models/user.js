@@ -11,8 +11,9 @@ const userSchema = mongoose.Schema({
     middleName: { type: String },
 
     file: { type: String },
-    role: { type: String, required: true, default: "student" }, //student, instructor, admin
-    courses: [{ type: String }],
+    role: { type: String, required: true, default: "admin" }, //student, instructor, admin
+    group: { type: String }, //if instructor this is the department
+    courses: [{ type: String }],//if instructor this is the courses taught
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 });

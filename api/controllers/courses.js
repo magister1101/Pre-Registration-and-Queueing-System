@@ -84,6 +84,9 @@ exports.createCourse = async (req, res) => {
         const course = new Course({
             _id: courseId,
             name: req.body.name,
+            code: req.body.code,
+            unit: req.body.unit,
+            course: req.body.course,
             description: req.body.description,
             prerequisite: req.body.prerequisite,
             file: req.body.file,
