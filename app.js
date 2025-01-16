@@ -10,6 +10,7 @@ const dotenv = require('dotenv').config();
 //routes link
 const userRoutes = require('./api/routes/users');
 const courseRoutes = require('./api/routes/courses');
+const queueRoutes = require('./api/routes/queues');
 
 
 mongoose.connect('mongodb+srv://admin:adminPassword@cluster0.oxixb.mongodb.net/');
@@ -47,6 +48,7 @@ app.use((req, res, next) => {
 // routes
 app.use('/users', userRoutes);
 app.use('/courses', courseRoutes);
+app.use('/queues', queueRoutes);
 
 
 app.use((req, res, next) => {

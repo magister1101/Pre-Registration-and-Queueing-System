@@ -13,7 +13,7 @@ const userSchema = mongoose.Schema({
     file: { type: String },
     role: { type: String, required: true, default: "admin" }, //student, instructor, admin
     group: { type: String }, //if instructor this is the department
-    courses: [{ type: String }],//if instructor this is the courses taught
+    courses: [{ type: String }],//if instructor this is the courses taught, if student this is the courses taken
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 });
