@@ -77,6 +77,79 @@ exports.getCourse = async (req, res) => {
     }
 };
 
+exports.getPrerequisite = async (req, res) => {
+    try {
+        const { courseId, isArchived, query, filter } = req.query;
+
+        const escapeRegex = (value) => {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        let searchCriteria = {};
+        const queryConditions = [];
+
+        if (query) {
+            const escapedQuery = escapeRegex(query);
+            const orConditions = [];
+
+            if (mongoose.Types.ObjectId.isValid(query)) {
+                orConditions.push({ _id: query });
+            }
+            orConditions.push(
+                { name: { $regex: escapedQuery, $options: 'i' } },
+                { section: { $regex: escapedQuery, $options: 'i' } },
+                { description: { $regex: escapedQuery, $options: 'i' } },
+            );
+
+            queryConditions.push({ $or: orConditions });
+        }
+
+        if (courseId) {
+            const escapedCourseId = escapeRegex(courseId);
+            const orConditions = [];
+
+            if (mongoose.Types.ObjectId.isValid(courseId)) {
+                orConditions.push({ _id: courseId });
+            }
+            orConditions.push(
+                { name: { $regex: escapedCourseId, $options: 'i' } },
+                { section: { $regex: escapedCourseId, $options: 'i' } },
+                { description: { $regex: escapedCourseId, $options: 'i' } },
+            );
+
+            queryConditions.push({ $or: orConditions });
+        }
+
+        if (filter) {
+            const escapedFilter = escapeRegex(filter);
+            queryConditions.push({
+                $or: [
+                    { prerequisite: { $regex: escapedFilter, $options: 'i' } },
+                ],
+            });
+        }
+
+        if (isArchived) {
+            const isArchivedBool = isArchived === 'true'; // Convert to boolean
+            queryConditions.push({ isArchived: isArchivedBool });
+        }
+
+        if (queryConditions.length > 0) {
+            searchCriteria = { $and: queryConditions };
+        }
+        const courses = await Course.find(searchCriteria, 'name prerequisite');
+
+        return res.status(200).json(courses);
+
+    } catch (error) {
+        console.error('Error retrieving courses:', error);
+        return res.status(500).json({
+            message: "Error in retrieving courses",
+            error: error.message || error,
+        });
+    }
+};
+
 exports.createCourse = async (req, res) => {
     try {
         const courseId = new mongoose.Types.ObjectId();

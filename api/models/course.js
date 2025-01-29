@@ -8,7 +8,7 @@ const courseSchema = mongoose.Schema({
     course: { type: String, required: true }, //course of the subject
     description: { type: String, required: true },
     prerequisite: [{ type: String }],
-    file: { type: String, required: true },
+    file: { type: String },
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 });

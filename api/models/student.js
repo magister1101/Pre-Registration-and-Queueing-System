@@ -12,10 +12,13 @@ const studentSchema = mongoose.Schema({
     section: { type: String }, //section of the program
 
     isRegular: { type: Boolean, required: true }, //if the student is regular or not
+    subject: [{ type: String }], //subjects the student will take
 
     semester: { type: String }, //semester of the program
     status: { type: String }, //status of the student (e.g. enrolled, waitlisted, dropped)
 
+    isArchived: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
 
 });
 

@@ -102,7 +102,19 @@ exports.createUser = async (req, res, next) => {
             lastName: req.body.lastName,
             middleName: req.body.middleName,
             file: req.body.file,
+
             role: req.body.role,
+            group: req.body.group,
+
+            courses: req.body.courses,
+
+            studentNumber: req.body.studentNumber,
+            course: req.body.course,
+            year: req.body.year,
+            section: req.body.section,
+
+            isRegular: req.body.isRegular,
+
             isArchived: req.body.isArchived,
         });
 
@@ -118,6 +130,53 @@ exports.createUser = async (req, res, next) => {
         console.error('Error creating user:', error);
         return res.status(500).json({
             message: "Error in creating user",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.loginUser = async (req, res, next) => {
+    try {
+        User.find({ username: req.body.username })
+            .exec()
+            .then(user => {
+                if (user.length < 1) {
+                    return res.status(401).json({
+                        message: 'Auth Failed (UserName Not found)'
+                    });
+                }
+                bcrypt.compare(req.body.password, user[0].password, (err, result) => {
+                    if (err) {
+                        return res.status(401).json({
+                            message: 'Auth Failed (incorrect Password)'
+                        });
+                    }
+                    if (result) {
+                        const token = jwt.sign({
+                            userId: user[0]._id,
+                            username: user[0].username,
+                        },
+                            process.env.JWT_SECRET, //private key
+                            {
+                                expiresIn: "8h" //key expires in # hour
+                            }
+                        )
+
+                        return res.status(200).json({
+                            message: 'Auth Successful',
+                            token: token,
+                        });
+                    }
+                    return res.status(401).json({
+                        message: 'Auth Failed'
+                    });
+                })
+            })
+    }
+    catch (error) {
+        console.error('Error logging in user:', error);
+        return res.status(500).json({
+            message: "Error in logging in user",
             error: error.message || error,
         });
     }
