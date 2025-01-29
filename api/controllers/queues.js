@@ -79,8 +79,6 @@ exports.getQueues = async (req, res) => {
         });
     }
 };
-
-// exports.createStudent = async (req, res) => {
 //     try {
 //         const _id = req.params.id;
 //         const student = new Student({
@@ -160,7 +158,7 @@ exports.getQueues = async (req, res) => {
 
 exports.checkPrerequisites = async (req, res) => {
     try {
-        const { studentId, selectedCourses } = req.body;
+        const { studentId, selectedCourses, destination } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
             return res.status(400).json({ message: 'Invalid student ID' });
@@ -173,6 +171,7 @@ exports.checkPrerequisites = async (req, res) => {
 
         const studentCourses = student.courses || [];
         let missingPrerequisites = {};
+        let metCourses = [];
 
         for (let courseId of selectedCourses) {
             if (!mongoose.Types.ObjectId.isValid(courseId)) continue;
@@ -180,9 +179,20 @@ exports.checkPrerequisites = async (req, res) => {
             const course = await Course.findById(courseId);
             if (!course) continue;
 
-            const missing = course.prerequisite.filter(prereq => !studentCourses.includes(prereq));
+            const missing = [];
+            for (let prereqId of course.prerequisite) {
+                if (!studentCourses.includes(prereqId)) {
+                    const prereqCourse = await Course.findById(prereqId);
+                    if (prereqCourse) {
+                        missing.push({ id: prereqCourse._id, name: prereqCourse.name });
+                    }
+                }
+            }
+
             if (missing.length > 0) {
                 missingPrerequisites[course.name] = missing;
+            } else {
+                metCourses.push({ id: course._id, name: course.name });
             }
         }
 
@@ -193,7 +203,12 @@ exports.checkPrerequisites = async (req, res) => {
             });
         }
 
-        return res.status(200).json({ message: 'All prerequisites met. Student can enroll in selected courses.' });
+        return res.status(200).json({
+            message: 'All prerequisites met. Student can enroll in selected courses.',
+            studentId,
+            selectedCourses: metCourses,
+            destination
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

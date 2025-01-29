@@ -9,7 +9,7 @@ const queueController = require('../controllers/queues');
 
 router.get('/', checkAuth, queueController.getQueues);
 
-router.get('/checkPrerequisites', queueController.checkPrerequisites)
+router.post('/checkPrerequisites', queueController.checkPrerequisites)
 
 router.post('/createQueue', checkAuth, queueController.createQueue)
 
