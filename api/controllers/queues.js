@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const Queue = require('../models/queue');
-const Student = require('../models/student');
 const User = require('../models/user');
 const Course = require('../models/course');
 
@@ -9,14 +8,14 @@ const performUpdate = (id, updateFields, res) => {
     Queue.findByIdAndUpdate(id, updateFields, { new: true })
         .then((updatedStudent) => {
             if (!updatedStudent) {
-                return res.status(404).json({ message: "User not found" });
+                return res.status(404).json({ message: "Queue not found" });
             }
             return updatedStudent;
 
         })
         .catch((err) => {
             return res.status(500).json({
-                message: "Error in updating user",
+                message: "Error in updating Queue",
                 error: err
             });
         })
@@ -172,3 +171,20 @@ exports.createQueue = async (req, res) => {
     }
 };
 
+exports.updateQueue = async (req, res) => {
+    try {
+
+        const queueId = await req.params.id;
+        const updateFields = await req.body;
+
+        const updatedCourse = performUpdate(queueId, updateFields, res);
+        return res.status(200).json(updatedCourse);
+    }
+    catch (error) {
+        console.error('Error updating course:', error);
+        return res.status(500).json({
+            message: "Error in updating course",
+            error: error.message || error,
+        });
+    }
+};

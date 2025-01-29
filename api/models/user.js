@@ -22,6 +22,7 @@ const userSchema = mongoose.Schema({
     section: { type: String }, //section of the program
 
     isRegular: { type: Boolean },
+    isEmailSent: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 });

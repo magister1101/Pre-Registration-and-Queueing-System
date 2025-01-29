@@ -1,8 +1,66 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require("nodemailer");
 
 const User = require('../models/user');
+
+// Configure Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.EMAIL_USER, // Your email address
+        pass: process.env.EMAIL_PASS  // Your email password or App Password
+    }
+});
+
+// Email Template Function
+const generateEmailTemplate = (studentName) => {
+    return `
+        <h2>Hello ${studentName},</h2>
+        <p>Welcome to our system! We are glad to have you.</p>
+        <p>If you have any questions, feel free to reach out.</p>
+        <br>
+        <p>Best Regards,</p>
+        <p>Your Organization Team</p>
+    `;
+};
+
+exports.sendEmail = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Invalid user ID format." });
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        const studentName = `${user.firstName} ${user.middleName ? user.middleName + " " : ""}${user.lastName}`;
+        const recipientEmail = user.email;
+
+        // Email options
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: "Welcome Email",
+            html: generateEmailTemplate(studentName)
+        };
+
+        performUpdate(id, { isEmailSent: true }, res);
+
+
+        await transporter.sendMail(mailOptions);
+        res.status(200).json({ message: "Email sent successfully!" });
+
+    } catch (error) {
+        console.error("Error sending email:", error);
+        res.status(500).json({ error: "Failed to send email" });
+    }
+};
 
 const performUpdate = (id, updateFields, res) => {
     User.findByIdAndUpdate(id, updateFields, { new: true })
