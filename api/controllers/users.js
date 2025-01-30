@@ -26,16 +26,32 @@ exports.sendEmail = async (req, res) => {
         // Email options
         const mailOptions = {
             from: process.env.EMAIL_USER,
+            replyTo: process.env.EMAIL_USER,
             to: recipientEmail,
             subject: "Cavite State University Pre-Registration",
+            text: generateEmailTemplate(studentName),
             html: generateEmailTemplate(studentName)
         };
 
         performUpdate(id, { isEmailSent: true }, res);
 
+        await new Promise((resolve, reject) => {
+            // send mail
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error(err);
+                    reject(err);
+                    res.status(500).json({ message: "Email failed successfully!" });
+                } else {
+                    console.log(info);
+                    resolve(info);
+                    res.status(200).json({ message: "Email sent successfully!" });
+                }
+            });
+        });
 
-        await transporter.sendMail(mailOptions);
-        res.status(200).json({ message: "Email sent successfully!" });
+
+
 
     } catch (error) {
         console.error("Error sending email:", error);
