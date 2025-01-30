@@ -4,8 +4,8 @@ require("dotenv").config(); // Ensure dotenv loads environment variables
 // Create Transporter
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",  // Explicitly set SMTP host
-    port: 465,               // Use 465 for SSL (or 587 for STARTTLS)
-    secure: true,            // True for 465, false for other ports
+    port: 587,               // Use 465 for SSL (or 587 for STARTTLS)
+    secure: false,            // True for 465, false for other ports
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
