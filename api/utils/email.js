@@ -1,6 +1,5 @@
-const express = require('express');
 const nodemailer = require("nodemailer");
-const router = express.Router();
+dotenv.config();
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
