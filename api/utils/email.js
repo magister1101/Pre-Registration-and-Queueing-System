@@ -8,14 +8,15 @@ const transporter = nodemailer.createTransport({
     secure: true,            // True for 465, false for other ports
     auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: process.env.EMAIL_PASSWORD,
     },
 });
 
 
 
 // Debugging - Ensure credentials are loaded
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+
     console.error("⚠️ Missing EMAIL_USER or EMAIL_PASS in environment variables.");
 }
 
