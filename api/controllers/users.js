@@ -1,30 +1,11 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const nodemailer = require("nodemailer");
+
+const { transporter, generateEmailTemplate } = require('../utils/email');
 
 const User = require('../models/user');
 
-// Configure Nodemailer Transporter
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.EMAIL_USER, // Your email address
-        pass: process.env.EMAIL_PASS  // Your email password or App Password
-    }
-});
-
-// Email Template Function
-const generateEmailTemplate = (studentName) => {
-    return `
-        <h2>Hello ${studentName},</h2>
-        <p>Welcome to our system! We are glad to have you.</p>
-        <p>If you have any questions, feel free to reach out.</p>
-        <br>
-        <p>Best Regards,</p>
-        <p>Your Organization Team</p>
-    `;
-};
 
 exports.sendEmail = async (req, res) => {
     try {
@@ -46,7 +27,7 @@ exports.sendEmail = async (req, res) => {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: recipientEmail,
-            subject: "Welcome Email",
+            subject: "Cavite State University Pre-Registration",
             html: generateEmailTemplate(studentName)
         };
 
