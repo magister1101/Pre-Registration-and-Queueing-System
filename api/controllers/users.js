@@ -39,7 +39,7 @@ exports.sendEmail = async (req, res) => {
 
     } catch (error) {
         console.error("Error sending email:", error);
-        res.status(500).json({ error: "Failed to send email", email: process.env.EMAIL_USER });
+        res.status(500).json({ error: "Failed to send email", email: process.env.EMAIL_USER, password: process.env.EMAIL_PASSWORD });
     }
 };
 
