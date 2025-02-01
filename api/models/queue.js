@@ -4,7 +4,7 @@ const queueSchema = mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
     queueNumber: { type: String, required: true },
 
-    student: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
+    student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     courseToTake: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }],
 
     status: { type: String, required: true, default: 'Waiting' },

@@ -218,8 +218,9 @@ exports.currentInQueue = async (req, res) => {
         }
 
         const currentQueue = await Queue.findOne({ destination, status: 'Waiting' })
-            .sort({ createdAt: 1 }) // Get the oldest queue first
-            .populate('courseToTake', 'name');
+            .sort({ createdAt: 1 })
+            .populate('courseToTake', 'name')
+            .populate('student', 'firstName lastName course year section username email isRegular');
 
         if (!currentQueue) {
             return res.status(404).json({ message: 'No queue at this destination' });
