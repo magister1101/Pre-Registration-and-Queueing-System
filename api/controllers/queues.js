@@ -4,6 +4,8 @@ const Queue = require('../models/queue');
 const User = require('../models/user');
 const Course = require('../models/course');
 
+const destinations = ['registrar', 'osas', 'cashier'];
+
 const performUpdate = (id, updateFields, res) => {
     Queue.findByIdAndUpdate(id, updateFields, { new: true })
         .then((updatedStudent) => {
@@ -66,7 +68,9 @@ exports.getQueues = async (req, res) => {
         if (queryConditions.length > 0) {
             searchCriteria = { $and: queryConditions };
         }
-        const queues = await Queue.find(searchCriteria);
+        const queues = await Queue.find(searchCriteria)
+            .sort({ createdAt: 1 }) // Get the oldest queue first
+            .populate('courseToTake', 'name');
 
         return res.status(200).json(queues);
 
@@ -141,7 +145,7 @@ exports.checkPrerequisites = async (req, res) => {
 exports.createQueue = async (req, res) => {
     try {
         const studentId = req.userData.userId;
-        const { selectedCourses, destination } = req.body;
+        const { selectedCourses } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
             return res.status(400).json({ message: 'Invalid student ID' });
@@ -159,12 +163,69 @@ exports.createQueue = async (req, res) => {
             queueNumber,
             student: studentId,
             courseToTake: selectedCourses,
-            destination,
+            destination: 'registrar',
             status: 'Waiting'
         });
 
         await newQueue.save();
         return res.status(201).json({ message: 'Queue created successfully', queue: newQueue });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.nextInQueue = async (req, res) => {
+    try {
+        const { queueId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(queueId)) {
+            return res.status(400).json({ message: 'Invalid queue ID' });
+        }
+
+        const queue = await Queue.findById(queueId);
+        if (!queue) {
+            return res.status(404).json({ message: 'Queue not found' });
+        }
+
+        const currentIndex = destinations.indexOf(queue.destination);
+        if (currentIndex === -1) {
+            return res.status(400).json({ message: 'Invalid destination' });
+        }
+
+        if (currentIndex === destinations.length - 1) {
+            queue.status = 'Completed';
+            queue.isArchived = true;
+        } else {
+            queue.destination = destinations[currentIndex + 1];
+            queue.queueNumber = `Q-${Date.now()}`;
+        }
+
+        await queue.save();
+        return res.status(200).json({ message: 'Queue moved to next destination', queue });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.currentInQueue = async (req, res) => {
+    try {
+        const { destination } = req.params;
+
+        if (!destinations.includes(destination)) {
+            return res.status(400).json({ message: 'Invalid destination' });
+        }
+
+        const currentQueue = await Queue.findOne({ destination, status: 'Waiting' })
+            .sort({ createdAt: 1 }) // Get the oldest queue first
+            .populate('courseToTake', 'name');
+
+        if (!currentQueue) {
+            return res.status(404).json({ message: 'No queue at this destination' });
+        }
+
+        return res.status(200).json({ currentQueue });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

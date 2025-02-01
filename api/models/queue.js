@@ -9,7 +9,7 @@ const queueSchema = mongoose.Schema({
 
     status: { type: String, required: true, default: 'Waiting' },
 
-    destination: { type: String, required: true }, //registrar,  Osas, Cashier
+    destination: { type: String, required: true }, // registrar → osas → cashier
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
 });
