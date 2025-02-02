@@ -4,6 +4,8 @@ const Queue = require('../models/queue');
 const User = require('../models/user');
 const Course = require('../models/course');
 
+const { emitQueueUpdate } = require('../../server');
+
 const destinations = ['registrar', 'osas', 'cashier'];
 
 const performUpdate = (id, updateFields, res) => {
@@ -43,8 +45,8 @@ exports.getQueues = async (req, res) => {
             }
             orConditions.push(
                 { queueNumber: { $regex: escapedQuery, $options: 'i' } },
-                { student: { $regex: escapedQuery, $options: 'i' } },
                 { description: { $regex: escapedQuery, $options: 'i' } },
+
             );
 
             queryConditions.push({ $or: orConditions });
@@ -70,7 +72,8 @@ exports.getQueues = async (req, res) => {
         }
         const queues = await Queue.find(searchCriteria)
             .sort({ createdAt: 1 }) // Get the oldest queue first
-            .populate('courseToTake', 'name');
+            .populate('courseToTake', 'name')
+            .populate('student', 'firstName middleName lastName course year section username email isRegular');
 
         return res.status(200).json(queues);
 
@@ -85,7 +88,8 @@ exports.getQueues = async (req, res) => {
 
 exports.checkPrerequisites = async (req, res) => {
     try {
-        const { studentId, selectedCourses, destination } = req.body;
+        const studentId = req.userData.userId;
+        const { selectedCourses, destination } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
             return res.status(400).json({ message: 'Invalid student ID' });
@@ -124,14 +128,16 @@ exports.checkPrerequisites = async (req, res) => {
         }
 
         if (Object.keys(missingPrerequisites).length > 0) {
-            return res.status(400).json({
+            return res.status(200).json({
+                missing: true,
                 message: 'Some prerequisites are missing.',
                 missingPrerequisites
             });
         }
 
         return res.status(200).json({
-            message: 'All prerequisites met. Student can enroll in selected courses.',
+            missing: false,
+            message: 'All prerequisites met.',
             studentId,
             selectedCourses: metCourses,
             destination
@@ -202,6 +208,7 @@ exports.nextInQueue = async (req, res) => {
         }
 
         await queue.save();
+        emitQueueUpdate();
         return res.status(200).json({ message: 'Queue moved to next destination', queue });
     } catch (error) {
         console.error(error);
@@ -217,7 +224,7 @@ exports.currentInQueue = async (req, res) => {
             return res.status(400).json({ message: 'Invalid destination' });
         }
 
-        const currentQueue = await Queue.findOne({ destination, status: 'Waiting' })
+        const currentQueue = await Queue.find({ destination, status: 'Waiting' })
             .sort({ createdAt: 1 })
             .populate('courseToTake', 'name')
             .populate('student', 'firstName lastName course year section username email isRegular');
@@ -240,6 +247,7 @@ exports.updateQueue = async (req, res) => {
         const updateFields = await req.body;
 
         const updatedCourse = performUpdate(queueId, updateFields, res);
+        emitQueueUpdate();
         return res.status(200).json(updatedCourse);
     }
     catch (error) {
