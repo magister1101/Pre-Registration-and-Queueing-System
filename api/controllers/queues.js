@@ -4,7 +4,6 @@ const Queue = require('../models/queue');
 const User = require('../models/user');
 const Course = require('../models/course');
 
-const { emitQueueUpdate } = require('../../server');
 
 const destinations = ['registrar', 'osas', 'cashier'];
 
@@ -208,7 +207,6 @@ exports.nextInQueue = async (req, res) => {
         }
 
         await queue.save();
-        emitQueueUpdate();
         return res.status(200).json({ message: 'Queue moved to next destination', queue });
     } catch (error) {
         console.error(error);
@@ -247,7 +245,6 @@ exports.updateQueue = async (req, res) => {
         const updateFields = await req.body;
 
         const updatedCourse = performUpdate(queueId, updateFields, res);
-        emitQueueUpdate();
         return res.status(200).json(updatedCourse);
     }
     catch (error) {
