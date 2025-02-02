@@ -12,9 +12,9 @@ const userSchema = mongoose.Schema({
     file: { type: String }, // picture if needed
 
     role: { type: String, required: true, default: "student" }, //student, instructor, admin
-    group: { type: String }, //if instructor this is the department, section if student
+    group: { type: String }, //if instructor this is the department
 
-    courses: [{ type: String }], //if student this is the courses taken
+    courses: [{ type: String, ref: 'Course' }], //if student this is the courses taken
 
     studentNumber: { type: String },//assignable?
     course: { type: String }, //porgram of the student ex. Information technology

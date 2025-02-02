@@ -142,7 +142,8 @@ exports.getUser = async (req, res) => {
         if (queryConditions.length > 0) {
             searchCriteria = { $and: queryConditions };
         }
-        const users = await User.find(searchCriteria);
+        const users = await User.find(searchCriteria)
+            .populate('courses', 'name');
 
         return res.status(200).json(users);
 
@@ -196,8 +197,7 @@ exports.createUser = async (req, res, next) => {
         const saveUser = await user.save();
 
         return res.status(201).json({
-            message: "User created successfully",
-            user: saveUser
+            saveUser
         });
 
     }
