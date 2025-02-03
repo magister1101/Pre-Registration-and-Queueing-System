@@ -72,7 +72,7 @@ exports.getQueues = async (req, res) => {
         }
         const queues = await Queue.find(searchCriteria)
             .sort({ createdAt: 1 }) // Get the oldest queue first
-            .populate('courseToTake', 'name')
+            .populate('courseToTake', 'name code unit course description')
             .populate('student', 'firstName middleName lastName course year section username email isRegular');
 
         return res.status(200).json(queues);
