@@ -21,6 +21,12 @@ const userSchema = mongoose.Schema({
     year: { type: String }, //year of study
     section: { type: String }, //section of the program
 
+    //for instructor
+    window: { type: Number, default: 0 },
+    successfulQueue: { type: Number, default: 0 },
+    missedQueue: { type: Number, default: 0 },
+    transferredQueue: { type: Number, default: 0 },
+
     isRegular: { type: Boolean },
     isEmailSent: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },

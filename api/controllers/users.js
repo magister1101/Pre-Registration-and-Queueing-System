@@ -156,6 +156,23 @@ exports.getUser = async (req, res) => {
     }
 };
 
+exports.myProfile = async (req, res) => {
+    try {
+        User.findOne({ _id: req.userData.userId })
+            .exec()
+            .then(user => {
+                return res.status(200).json(user);
+            })
+    }
+    catch (error) {
+        console.error('Error retrieving user:', error);
+        return res.status(500).json({
+            message: "Error in retrieving user",
+            error: error.message || error,
+        });
+    }
+};
+
 exports.createUser = async (req, res, next) => {
     try {
         const existingUser = await User.find({
@@ -269,6 +286,23 @@ exports.tokenValidation = (req, res, next) => {
     } catch (error) {
         console.error('Error validating token:', error);
         return res.status(500).json({ isValid: false });
+    }
+};
+
+exports.resetQueueCounter = async (req, res, next) => {
+    try {
+        const userId = req.userData.userId;
+        const updateFields = {
+            successfulQueue: 0,
+            missedQueue: 0,
+            transferredQueue: 0,
+        }
+
+        const updatedUser = performUpdate(userId, updateFields, res);
+        return res.status(200).json(updatedUser)
+
+    } catch (error) {
+        console.error('Error resetting queue:', error);
     }
 };
 

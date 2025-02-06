@@ -9,7 +9,11 @@ const user = require('../models/user');
 
 router.get('/', UsersController.getUser);
 
+router.get('/myProfile', checkAuth, UsersController.myProfile);
+
 router.get('/tokenValidation', UsersController.tokenValidation);
+
+router.get('/resetQueue', checkAuth, UsersController.resetQueueCounter);
 
 router.post('/create', UsersController.createUser);
 

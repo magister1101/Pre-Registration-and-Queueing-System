@@ -25,6 +25,23 @@ const performUpdate = (id, updateFields, res) => {
         })
 };
 
+const performUpdateonUser = (id, updateFields, res) => {
+    User.findByIdAndUpdate(id, updateFields, { new: true })
+        .then((updatedUser) => {
+            if (!updatedUser) {
+                return res.status(404).json({ message: "User not found" });
+            }
+            return updatedUser;
+
+        })
+        .catch((err) => {
+            return res.status(500).json({
+                message: "Error in updating user",
+                error: err
+            });
+        })
+};
+
 exports.getQueues = async (req, res) => {
     try {
         const { isArchived, query, filter } = req.query;
@@ -208,11 +225,52 @@ exports.nextInQueue = async (req, res) => {
         }
 
         await queue.save();
-        broadcastUpdate({ event: 'queueUpdated', queue });
+        const queues = await Queue.find().sort({ createdAt: 1 }) //get all ques
+
+        broadcastUpdate({ event: 'queueUpdated', queues });
+
+        const getUserSuccessfulQueue = await User.findOne({ _id: req.userData.userId })
+        const addOne = getUserSuccessfulQueue.transferredQueue + 1;
+        const updatedUser = performUpdateonUser(req.userData.userId, { transferredQueue: addOne }, res);
+
         return res.status(200).json({ message: 'Queue moved to next destination', queue });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.doneInQueue = async (req, res) => {
+    try {
+        const { queueId } = req.params;
+        const updateFields = { status: 'Completed' };
+
+        const updatedQueue = performUpdate(queueId, updateFields, res);
+        const getUserSuccessfulQueue = await User.findOne({ _id: req.userData.userId })
+        const addOne = getUserSuccessfulQueue.successfulQueue + 1;
+        const updatedUser = performUpdateonUser(req.userData.userId, { successfulQueue: addOne }, res);
+        return res.status(200).json(updatedQueue);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'error in doneInQueue' });
+    }
+};
+
+exports.cancelQueue = async (req, res) => {
+    try {
+        const { queueId } = req.params;
+        const updateFields = { status: 'Cancelled' };
+
+        const updatedQueue = performUpdate(queueId, updateFields, res);
+        const getUserSuccessfulQueue = await User.findOne({ _id: req.userData.userId })
+        const addOne = getUserSuccessfulQueue.missedQueue + 1;
+        const updatedUser = performUpdateonUser(req.userData.userId, { missedQueue: addOne }, res);
+        return res.status(200).json(updatedQueue);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'error in doneInQueue' });
     }
 };
 
@@ -246,8 +304,8 @@ exports.updateQueue = async (req, res) => {
         const queueId = await req.params.id;
         const updateFields = await req.body;
 
-        const updatedCourse = performUpdate(queueId, updateFields, res);
-        return res.status(200).json(updatedCourse);
+        const updatedQueue = performUpdate(queueId, updateFields, res);
+        return res.status(200).json(updatedQueue);
     }
     catch (error) {
         console.error('Error updating course:', error);

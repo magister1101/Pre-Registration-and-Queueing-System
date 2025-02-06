@@ -16,7 +16,11 @@ router.post('/checkPrerequisites', checkAuth, queueController.checkPrerequisites
 
 router.post('/updateQueue/:id', checkAuth, queueController.updateQueue);
 
-router.put('/next/:queueId', queueController.nextInQueue);
+router.post('/done/:queueId', checkAuth, queueController.doneInQueue);
+
+router.post('/cancel/:queueId', checkAuth, queueController.cancelQueue);
+
+router.put('/next/:queueId', checkAuth, queueController.nextInQueue);
 
 
 module.exports = router;

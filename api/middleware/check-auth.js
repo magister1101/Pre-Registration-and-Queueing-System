@@ -5,7 +5,7 @@ const dotenv = require('dotenv').config();
 module.exports = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        console.log(authHeader);
+        console.log("auth header:", authHeader);
 
         if (!authHeader) {
             return res.status(401).json({ message: 'Authorization header missing' });
