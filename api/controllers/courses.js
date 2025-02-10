@@ -2,19 +2,37 @@
 const mongoose = require('mongoose');
 
 const Course = require('../models/course');
+const Program = require('../models/program');
 
 const performUpdate = (id, updateFields, res) => {
     Course.findByIdAndUpdate(id, updateFields, { new: true })
         .then((updatedCourse) => {
             if (!updatedCourse) {
-                return res.status(404).json({ message: "Course not found" });
+                return { message: "Course not found" };
             }
             return updatedCourse;
 
         })
         .catch((err) => {
-            return res.status(500).json({
+            return ({
                 message: "Error in updating Course",
+                error: err
+            });
+        })
+};
+
+const performUpdateProgram = (id, updateFields, res) => {
+    Program.findByIdAndUpdate(id, updateFields, { new: true })
+        .then((updatedProgram) => {
+            if (!updatedProgram) {
+                return { message: "Program not found" };
+            }
+            return updatedProgram;
+
+        })
+        .catch((err) => {
+            return ({
+                message: "Error in updating Program",
                 error: err
             });
         })
@@ -72,6 +90,53 @@ exports.getCourse = async (req, res) => {
         console.error('Error retrieving courses:', error);
         return res.status(500).json({
             message: "Error in retrieving courses",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.getProgram = async (req, res) => {
+    try {
+        const { isArchived, query } = req.query;
+
+        const escapeRegex = (value) => {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        let searchCriteria = {};
+        const queryConditions = [];
+
+        if (query) {
+            const escapedQuery = escapeRegex(query);
+            const orConditions = [];
+
+            if (mongoose.Types.ObjectId.isValid(query)) {
+                orConditions.push({ _id: query });
+            }
+            orConditions.push(
+                { name: { $regex: escapedQuery, $options: 'i' } },
+                { code: { $regex: escapedQuery, $options: 'i' } },
+            );
+
+            queryConditions.push({ $or: orConditions });
+        }
+
+        if (isArchived) {
+            const isArchivedBool = isArchived === 'true'; // Convert to boolean
+            queryConditions.push({ isArchived: isArchivedBool });
+        }
+
+        if (queryConditions.length > 0) {
+            searchCriteria = { $and: queryConditions };
+        }
+        const programs = await Program.find(searchCriteria);
+
+        return res.status(200).json(programs);
+
+    } catch (error) {
+        console.error('Error retrieving programs:', error);
+        return res.status(500).json({
+            message: "Error in retrieving programs",
             error: error.message || error,
         });
     }
@@ -177,6 +242,52 @@ exports.createCourse = async (req, res) => {
         console.error('Error creating course:', error);
         return res.status(500).json({
             message: "Error in creating course",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.createProgram = async (req, res) => {
+    try {
+        const programId = new mongoose.Types.ObjectId();
+
+        const program = new Program({
+            _id: programId,
+            name: req.body.name,
+            code: req.body.code,
+            file: req.body.file,
+            isArchived: false,
+        })
+
+        const saveProgram = await program.save();
+        return res.status(201).json({
+            message: "Program created successfully",
+            program: saveProgram
+        });
+
+    }
+    catch (error) {
+        console.error('Error creating program:', error);
+        return res.status(500).json({
+            message: "Error in creating program",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.updateProgram = async (req, res) => {
+    try {
+
+        const programId = await req.params.programId;
+        const updateFields = await req.body;
+
+        const updatedProgram = performUpdateProgram(programId, updateFields, res);
+        return res.status(200).json(updatedProgram);
+    }
+    catch (error) {
+        console.error('Error updating program:', error);
+        return res.status(500).json({
+            message: "Error in updating program",
             error: error.message || error,
         });
     }
