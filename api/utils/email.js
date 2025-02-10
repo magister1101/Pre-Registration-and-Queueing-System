@@ -33,8 +33,21 @@ const generateEmailTemplate = (studentName) => {
     `;
 };
 
+const generateEmailTemplateInvalidCredentials = (studentName) => {
+    return `
+        <h2>Hello ${studentName},</h2>
+        <p>We noticed that you attempted to register courses you have not taken.</p>
+        <p>Please double-check the courses you have registered for and try to register again again.</p>
+        <p>If you continue to misinput your courses, you will be unable to enroll in your courses.</p>
+        <br>
+        <p>Best Regards,</p>
+        <p>Your Organization Team</p>
+    `;
+};
+
 // Export Transporter & Template
 module.exports = {
     transporter,
     generateEmailTemplate,
+    generateEmailTemplateInvalidCredentials,
 };

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-const { transporter, generateEmailTemplate } = require('../utils/email');
+const { transporter, generateEmailTemplate, generateEmailTemplateInvalidCredentials } = require('../utils/email');
 
 const User = require('../models/user');
 
@@ -59,17 +59,69 @@ exports.sendEmail = async (req, res) => {
     }
 };
 
+exports.sendEmailReject = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Invalid user ID format." });
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        const studentName = `${user.firstName} ${user.middleName ? user.middleName + " " : ""}${user.lastName}`;
+        const recipientEmail = user.email;
+
+        // Email options
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            replyTo: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: "Cavite State University Pre-Registration",
+            text: generateEmailTemplateInvalidCredentials(studentName),
+            html: generateEmailTemplateInvalidCredentials(studentName)
+        };
+
+        performUpdate(id, { isEmailSent: true }, res);
+
+        await new Promise((resolve, reject) => {
+            // send mail
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    console.error(err);
+                    reject(err);
+                    res.status(500).json({ message: "Email failed successfully!" });
+                } else {
+                    console.log(info);
+                    resolve(info);
+                    res.status(200).json({ message: "Email sent successfully!" });
+                }
+            });
+        });
+
+
+
+
+    } catch (error) {
+        console.error("Error sending email:", error);
+        res.status(500).json({ error: "Failed to send email" });
+    }
+};
+
 const performUpdate = (id, updateFields, res) => {
     User.findByIdAndUpdate(id, updateFields, { new: true })
         .then((updatedUser) => {
             if (!updatedUser) {
-                return res.status(404).json({ message: "User not found" });
+                return ({ message: "User not found" });
             }
             return updatedUser;
 
         })
         .catch((err) => {
-            return res.status(500).json({
+            return ({
                 message: "Error in updating user",
                 error: err
             });
@@ -310,23 +362,18 @@ exports.updateUser = async (req, res, next) => {
     try {
         const userId = req.params.userId;
         const updateFields = req.body;
+        console.log(updateFields);
 
         if (updateFields.password) {
             const bcrypt = require('bcrypt');
             const saltRounds = 10;
+            console.log("salt")
 
-            bcrypt.hash(updateFields.password, saltRounds, async (err, hash) => {
-                if (err) {
-                    return res.status(500).json({
-                        message: "Error in updating user password",
-                        error: err
-                    })
-                }
-                updateFields.password = hash;
-
-            })
+            const hashedPassword = await bcrypt.hash(updateFields.password, saltRounds);
+            updateFields.password = hashedPassword;
         }
 
+        console.log("last", updateFields);
         const updatedUser = performUpdate(userId, updateFields, res);
         return res.status(200).json(updatedUser)
 
