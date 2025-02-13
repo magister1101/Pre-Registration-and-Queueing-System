@@ -7,7 +7,7 @@ const courseSchema = mongoose.Schema({
     unit: { type: Number, required: true }, //no. of units
     course: { type: String, required: true }, //program of the subject
     description: { type: String, required: true },
-    prerequisite: [{ type: String }],
+    prerequisite: [{ type: String, ref: 'Course' }],
     file: { type: String },
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
