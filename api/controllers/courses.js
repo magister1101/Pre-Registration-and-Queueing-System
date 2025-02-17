@@ -83,7 +83,7 @@ exports.getCourse = async (req, res) => {
             searchCriteria = { $and: queryConditions };
         }
         const courses = await Course.find(searchCriteria)
-            .populate('prerequisite', 'name');
+            .populate('prerequisite', 'name code');
 
         return res.status(200).json(courses);
 

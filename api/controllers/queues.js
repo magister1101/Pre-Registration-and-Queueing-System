@@ -63,6 +63,7 @@ exports.getQueues = async (req, res) => {
             orConditions.push(
                 { queueNumber: { $regex: escapedQuery, $options: 'i' } },
                 { description: { $regex: escapedQuery, $options: 'i' } },
+                { status: { $regex: escapedQuery, $options: 'i' } },
 
             );
 
@@ -284,7 +285,7 @@ exports.currentInQueue = async (req, res) => {
 
         const currentQueue = await Queue.find({ destination, status: 'Waiting' })
             .sort({ createdAt: 1 })
-            .populate('courseToTake', 'name')
+            .populate('courseToTake', 'name code unit course description')
             .populate('student', 'firstName lastName course year section username email isRegular');
 
         if (!currentQueue) {

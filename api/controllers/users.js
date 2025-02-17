@@ -367,13 +367,10 @@ exports.updateUser = async (req, res, next) => {
         if (updateFields.password) {
             const bcrypt = require('bcrypt');
             const saltRounds = 10;
-            console.log("salt")
 
             const hashedPassword = await bcrypt.hash(updateFields.password, saltRounds);
             updateFields.password = hashedPassword;
         }
-
-        console.log("last", updateFields);
         const updatedUser = performUpdate(userId, updateFields, res);
         return res.status(200).json(updatedUser)
 
