@@ -85,7 +85,7 @@ exports.sendEmailReject = async (req, res) => {
             html: generateEmailTemplateInvalidCredentials(studentName)
         };
 
-        performUpdate(id, { isEmailSent: true }, res);
+        performUpdate(id, { isEmailSent: false }, res);
 
         await new Promise((resolve, reject) => {
             // send mail
@@ -289,32 +289,40 @@ exports.loginUser = async (req, res, next) => {
                         message: 'Auth Failed (UserName Not found)'
                     });
                 }
-                bcrypt.compare(req.body.password, user[0].password, (err, result) => {
-                    if (err) {
-                        return res.status(401).json({
-                            message: 'Auth Failed (incorrect Password)'
-                        });
-                    }
-                    if (result) {
-                        const token = jwt.sign({
-                            userId: user[0]._id,
-                            username: user[0].username,
-                        },
-                            process.env.JWT_SECRET, //private key
-                            {
-                                expiresIn: "8h" //key expires in # hour
-                            }
-                        )
 
-                        return res.status(200).json({
-                            message: 'Auth Successful',
-                            token: token,
+                console.log(user[0].isArchived);
+                if (user[0].isEmailSent && !user[0].isArchived) {
+                    bcrypt.compare(req.body.password, user[0].password, (err, result) => {
+                        if (err) {
+                            return res.status(401).json({
+                                message: 'Auth Failed (incorrect Password)'
+                            });
+                        }
+                        if (result) {
+                            const token = jwt.sign({
+                                userId: user[0]._id,
+                                username: user[0].username,
+                            },
+                                process.env.JWT_SECRET, //private key
+                                {
+                                    expiresIn: "8h" //key expires in # hour
+                                }
+                            )
+
+                            return res.status(200).json({
+                                message: 'Auth Successful',
+                                token: token,
+                            });
+                        }
+                        return res.status(401).json({
+                            message: 'Auth Failed'
                         });
-                    }
+                    })
+                } else {
                     return res.status(401).json({
                         message: 'Auth Failed'
                     });
-                })
+                }
             })
     }
     catch (error) {
