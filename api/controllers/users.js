@@ -195,7 +195,7 @@ exports.getUser = async (req, res) => {
             searchCriteria = { $and: queryConditions };
         }
         const users = await User.find(searchCriteria)
-            .populate('courses', 'name');
+            .populate('courses', 'name code');
 
         return res.status(200).json(users);
 
