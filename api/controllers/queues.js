@@ -121,9 +121,18 @@ exports.checkPrerequisites = async (req, res) => {
         const studentCourses = student.courses || [];
         let missingPrerequisites = {};
         let metCourses = [];
+        let alreadyTakenCourses = [];
 
         for (let courseId of selectedCourses) {
             if (!mongoose.Types.ObjectId.isValid(courseId)) continue;
+
+            if (studentCourses.includes(courseId)) {
+                const takenCourse = await Course.findById(courseId);
+                if (takenCourse) {
+                    alreadyTakenCourses.push({ id: takenCourse._id, name: takenCourse.name });
+                }
+                continue;
+            }
 
             const course = await Course.findById(courseId);
             if (!course) continue;
@@ -143,6 +152,14 @@ exports.checkPrerequisites = async (req, res) => {
             } else {
                 metCourses.push({ id: course._id, name: course.name });
             }
+        }
+
+        if (alreadyTakenCourses.length > 0) {
+            return res.status(400).json({
+                error: true,
+                message: 'Some courses have already been taken.',
+                selectedCourses: alreadyTakenCourses
+            });
         }
 
         if (Object.keys(missingPrerequisites).length > 0) {
