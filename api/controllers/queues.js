@@ -158,7 +158,7 @@ exports.checkPrerequisites = async (req, res) => {
             return res.status(200).json({
                 missing: true,
                 message: 'Some courses have already been taken.',
-                missingPrerequisites: alreadyTakenCourses
+                alreadyTakenCourses
             });
         }
 
