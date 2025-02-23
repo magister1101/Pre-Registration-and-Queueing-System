@@ -228,7 +228,7 @@ exports.myProfile = async (req, res) => {
 exports.createUser = async (req, res, next) => {
     try {
         const existingUser = await User.find({
-            $or: [{ username: req.body.username }, { email: req.body.email }]
+            $or: [{ username: req.body.username }]
         });
 
         if (existingUser.length > 0) {
