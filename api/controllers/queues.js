@@ -199,31 +199,44 @@ exports.createQueue = async (req, res) => {
 
         const queueNumber = `Q-${Date.now()}`;
 
-        if (req.body.destination) {
 
-            const newQueue = new Queue({
-                _id: new mongoose.Types.ObjectId(),
-                queueNumber,
-                destination: req.body.destination,
-                status: 'Waiting'
-            });
+        const newQueue = new Queue({
+            _id: new mongoose.Types.ObjectId(),
+            queueNumber,
+            student: studentId,
+            courseToTake: selectedCourses,
+            destination: 'registrar',
+            status: 'Waiting'
+        });
 
-            await newQueue.save();
-        }
-        else {
-            const newQueue = new Queue({
-                _id: new mongoose.Types.ObjectId(),
-                queueNumber,
-                student: studentId,
-                courseToTake: selectedCourses,
-                destination: 'registrar',
-                status: 'Waiting'
-            });
-
-            await newQueue.save();
-        }
-
+        await newQueue.save();
         return res.status(201).json({ message: 'Queue created successfully', queue: newQueue });
+
+
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.createTransaction = async (req, res) => {
+    try {
+
+        const destination = req.body.destination;
+        const queueNumber = `Q-${Date.now()}`;
+        const newQueue = new Queue({
+            _id: new mongoose.Types.ObjectId(),
+            queueNumber,
+            destination: destination,
+            status: 'Waiting'
+        });
+
+        await newQueue.save();
+        return res.status(201).json({ message: 'Queue created successfully', queue: newQueue });
+
+
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
