@@ -199,16 +199,30 @@ exports.createQueue = async (req, res) => {
 
         const queueNumber = `Q-${Date.now()}`;
 
-        const newQueue = new Queue({
-            _id: new mongoose.Types.ObjectId(),
-            queueNumber,
-            student: studentId,
-            courseToTake: selectedCourses,
-            destination: 'registrar',
-            status: 'Waiting'
-        });
+        if (req.body.destination) {
 
-        await newQueue.save();
+            const newQueue = new Queue({
+                _id: new mongoose.Types.ObjectId(),
+                queueNumber,
+                destination: req.body.destination,
+                status: 'Waiting'
+            });
+
+            await newQueue.save();
+        }
+        else {
+            const newQueue = new Queue({
+                _id: new mongoose.Types.ObjectId(),
+                queueNumber,
+                student: studentId,
+                courseToTake: selectedCourses,
+                destination: 'registrar',
+                status: 'Waiting'
+            });
+
+            await newQueue.save();
+        }
+
         return res.status(201).json({ message: 'Queue created successfully', queue: newQueue });
     } catch (error) {
         console.error(error);
