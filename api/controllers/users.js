@@ -260,7 +260,7 @@ exports.createUser = async (req, res, next) => {
             section: req.body.section,
 
             isRegular: req.body.isRegular,
-
+            isEmailSent: req.body.isEmailSent,
             isArchived: req.body.isArchived,
         });
 
