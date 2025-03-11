@@ -130,7 +130,7 @@ const performUpdate = (id, updateFields, res) => {
 
 exports.getUser = async (req, res) => {
     try {
-        const { isArchived, query, filter, emailed, role } = req.query;
+        const { isArchived, query, filter, emailed, role, program } = req.query;
 
         const escapeRegex = (value) => {
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -173,6 +173,15 @@ exports.getUser = async (req, res) => {
             queryConditions.push({
                 $or: [
                     { role: { $regex: escapedFilter, $options: 'i' } },
+                ],
+            });
+        }
+
+        if (program) {
+            const escapedProgram = escapeRegex(program);
+            queryConditions.push({
+                $or: [
+                    { role: { $regex: escapedProgram, $options: 'i' } },
                 ],
             });
         }
