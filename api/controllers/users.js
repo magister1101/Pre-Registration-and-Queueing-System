@@ -181,7 +181,7 @@ exports.getUser = async (req, res) => {
             const escapedProgram = escapeRegex(program);
             queryConditions.push({
                 $or: [
-                    { role: { $regex: escapedProgram, $options: 'i' } },
+                    { course: { $regex: escapedProgram, $options: 'i' } },
                 ],
             });
         }
