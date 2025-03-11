@@ -40,7 +40,7 @@ const performUpdateProgram = (id, updateFields, res) => {
 
 exports.getCourse = async (req, res) => {
     try {
-        const { isArchived, query, filter } = req.query;
+        const { isArchived, query, filter, program } = req.query;
 
         const escapeRegex = (value) => {
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -70,6 +70,15 @@ exports.getCourse = async (req, res) => {
             queryConditions.push({
                 $or: [
                     { prerequisite: { $regex: escapedFilter, $options: 'i' } },
+                ],
+            });
+        }
+
+        if (program) {
+            const escapedProgram = escapeRegex(filter);
+            queryConditions.push({
+                $or: [
+                    { crouse: { $regex: escapedProgram, $options: 'i' } },
                 ],
             });
         }
