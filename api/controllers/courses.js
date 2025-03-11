@@ -75,10 +75,10 @@ exports.getCourse = async (req, res) => {
         }
 
         if (program) {
-            const escapedProgram = escapeRegex(filter);
+            const escapedProgram = escapeRegex(program);
             queryConditions.push({
                 $or: [
-                    { crouse: { $regex: escapedProgram, $options: 'i' } },
+                    { course: { $regex: escapedProgram, $options: 'i' } },
                 ],
             });
         }
