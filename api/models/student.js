@@ -13,6 +13,7 @@ const studentSchema = mongoose.Schema({
 
     isRegular: { type: Boolean, required: true }, //if the student is regular or not
     subject: [{ type: String }], //subjects the student will take
+    courseToTake: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
 
     semester: { type: String }, //semester of the program
     status: { type: String }, //status of the student (e.g. enrolled, waitlisted, dropped)

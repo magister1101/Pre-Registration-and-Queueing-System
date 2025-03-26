@@ -234,6 +234,7 @@ exports.createCourse = async (req, res) => {
             name: req.body.name,
             code: req.body.code,
             unit: req.body.unit,
+            year: req.body.year,
             course: req.body.course,
             description: req.body.description,
             prerequisite: req.body.prerequisite,

@@ -106,8 +106,7 @@ exports.getQueues = async (req, res) => {
 
 exports.checkPrerequisites = async (req, res) => {
     try {
-        const studentId = req.userData.userId;
-        const { selectedCourses, destination } = req.body;
+        const { selectedCourses, destination, studentId } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
             return res.status(400).json({ message: 'Invalid student ID' });
@@ -170,6 +169,21 @@ exports.checkPrerequisites = async (req, res) => {
             });
         }
 
+        User.findByIdAndUpdate(studentId, { courseToTake: selectedCourses }, { new: true })
+            .then((updatedUser) => {
+                if (!updatedUser) {
+                    return ({ message: "User not found" });
+                }
+                return updatedUser;
+
+            })
+            .catch((err) => {
+                return ({
+                    message: "Error in updating user",
+                    error: err
+                });
+            })
+
         return res.status(200).json({
             missing: false,
             message: 'All prerequisites met.',
@@ -186,7 +200,6 @@ exports.checkPrerequisites = async (req, res) => {
 exports.createQueue = async (req, res) => {
     try {
         const studentId = req.userData.userId;
-        const { selectedCourses } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
             return res.status(400).json({ message: 'Invalid student ID' });
@@ -204,7 +217,7 @@ exports.createQueue = async (req, res) => {
             _id: new mongoose.Types.ObjectId(),
             queueNumber,
             student: studentId,
-            courseToTake: selectedCourses,
+            courseToTake: student.courseToTake,
             destination: 'registrar',
             status: 'Waiting'
         });

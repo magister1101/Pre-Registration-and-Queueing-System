@@ -15,8 +15,9 @@ const userSchema = mongoose.Schema({
     group: { type: String }, //if instructor this is the department
 
     courses: [{ type: String, ref: 'Course' }], //if student this is the courses taken
+    courseToTake: [{ type: String, ref: 'Course' }], //if student this is the courses to take
 
-    studentNumber: { type: String },//assignable?
+    studentNumber: { type: String, unique: true },
     course: { type: String }, //porgram of the student ex. Information technology
     year: { type: String }, //year of study
     section: { type: String }, //section of the program
