@@ -8,10 +8,12 @@ const queueSchema = mongoose.Schema({
     courseToTake: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
 
     status: { type: String, required: true, default: 'Waiting' },
+    estimatedTime: { type: Number, required: true },
 
     destination: { type: String, required: true },
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
+
 });
 
 module.exports = mongoose.model('Queue', queueSchema);

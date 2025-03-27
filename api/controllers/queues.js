@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Queue = require('../models/queue');
 const User = require('../models/user');
 const Course = require('../models/course');
+const Counter = require('../models/counter');
 const { broadcastUpdate } = require('../../websocket'); // Import from websocket.js
 
 
@@ -210,8 +211,21 @@ exports.createQueue = async (req, res) => {
             return res.status(404).json({ message: 'Student not found' });
         }
 
-        const queueNumber = `Q-${Date.now()}`;
+        // Find and increment the counter
+        const counter = await Counter.findOneAndUpdate(
+            { name: 'queueNumber' },
+            { $inc: { value: 1 } },
+            { new: true, upsert: true }
+        );
 
+        const queueNumber = `Q-${counter.value}`;
+
+        // Count waiting queues
+        const waitingQueues = await Queue.countDocuments({ status: 'Waiting' });
+
+        // Calculate estimated waiting time
+        const estimatedTimePerQueue = 5;
+        const estimatedTime = waitingQueues * estimatedTimePerQueue;
 
         const newQueue = new Queue({
             _id: new mongoose.Types.ObjectId(),
@@ -219,7 +233,8 @@ exports.createQueue = async (req, res) => {
             student: studentId,
             courseToTake: student.courseToTake,
             destination: 'registrar',
-            status: 'Waiting'
+            status: 'Waiting',
+            estimatedTime
         });
 
         await newQueue.save();
@@ -235,26 +250,45 @@ exports.createQueue = async (req, res) => {
 
 exports.createTransaction = async (req, res) => {
     try {
-
         const destination = req.body.destination;
-        const queueNumber = `Q-${Date.now()}`;
+
+        // Find and increment the counter
+        const counter = await Counter.findOneAndUpdate(
+            { name: 'queueNumber' },
+            { $inc: { value: 1 } },
+            { new: true, upsert: true }
+        );
+
+        const queueNumber = `Q-${counter.value}`;
+
+        // Count waiting queues
+        const waitingQueues = await Queue.countDocuments({ status: 'Waiting' });
+
+        // Calculate estimated waiting time
+        const estimatedTimePerQueue = 5;
+        const estimatedTime = waitingQueues * estimatedTimePerQueue;
+
         const newQueue = new Queue({
             _id: new mongoose.Types.ObjectId(),
             queueNumber,
-            destination: destination,
-            status: 'Waiting'
+            destination,
+            status: 'Waiting',
+            estimatedTime
         });
 
         await newQueue.save();
-        return res.status(201).json({ message: 'Queue created successfully', queue: newQueue });
 
-
+        return res.status(201).json({
+            message: 'Queue created successfully',
+            queue: newQueue
+        });
 
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 
 exports.nextInQueue = async (req, res) => {
     try {
