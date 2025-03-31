@@ -21,17 +21,25 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
 }
 
 // Email Template Function
-const generateEmailTemplate = (studentName) => {
+const generateEmailTemplate = (studentName, courseToTake) => {
     return `
         <h2>Hello ${studentName},</h2>
         <p>Welcome to Cavite State University - Tanza Campus! We are glad to have you.</p>
         <p>You may now proceed to the school and register for your courses.</p>
         <p>Please note that you will need to provide your student account to access your courses.</p>
         <br>
+        <p>Below is the list of courses you have registered for:</p>
+        <ul>
+            ${courseToTake.map((course) => `
+                <li>${course.courseName} - ${course.courseCode}</li>
+            `).join('')}
+        </ul>
+        <br>
         <p>Best Regards,</p>
         <p>Your Organization Team</p>
     `;
 };
+
 
 const generateEmailTemplateInvalidCredentials = (studentName) => {
     return `

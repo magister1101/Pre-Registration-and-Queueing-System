@@ -15,7 +15,11 @@ exports.sendEmail = async (req, res) => {
             return res.status(400).json({ error: "Invalid user ID format." });
         }
 
-        const user = await User.findById(id);
+        // Use populate to get course details
+        const user = await User.findById(id)
+            .populate('courseToTake')  // Populate course details
+            .exec();
+
         if (!user) {
             return res.status(404).json({ error: "User not found." });
         }
@@ -23,35 +27,40 @@ exports.sendEmail = async (req, res) => {
         const studentName = `${user.firstName} ${user.middleName ? user.middleName + " " : ""}${user.lastName}`;
         const recipientEmail = user.email;
 
+        // Validate and map the courses
+        const courseToTake = Array.isArray(user.courseToTake) ? user.courseToTake : [];
+        console.log("Populated courseToTake:", JSON.stringify(courseToTake, null, 2));
+
+        // Map courses with name and code
+        const formattedCourses = courseToTake.length > 0
+            ? courseToTake.map(course => ({
+                courseName: course.name || "Unknown",
+                courseCode: course.code || "-"
+            }))
+            : [{ courseName: "No courses found", courseCode: "-" }];
+
         // Email options
         const mailOptions = {
             from: process.env.EMAIL_USER,
             replyTo: process.env.EMAIL_USER,
             to: recipientEmail,
             subject: "Cavite State University Pre-Registration",
-            text: generateEmailTemplate(studentName),
-            html: generateEmailTemplate(studentName)
+            text: generateEmailTemplate(studentName, formattedCourses),
+            html: generateEmailTemplate(studentName, formattedCourses)
         };
 
-        performUpdate(id, { isEmailSent: true }, res);
+        // Update isEmailSent before sending the email
+        await User.findByIdAndUpdate(id, { isEmailSent: true });
 
-        await new Promise((resolve, reject) => {
-            // send mail
-            transporter.sendMail(mailOptions, (err, info) => {
-                if (err) {
-                    console.error(err);
-                    reject(err);
-                    res.status(500).json({ message: "Email failed successfully!" });
-                } else {
-                    console.log(info);
-                    resolve(info);
-                    res.status(200).json({ message: "Email sent successfully!" });
-                }
-            });
+        // Send the email
+        transporter.sendMail(mailOptions, (err, info) => {
+            if (err) {
+                console.error("Email Error:", err);
+                return res.status(500).json({ message: "Failed to send email." });
+            }
+            console.log("Email sent:", info.response);
+            res.status(200).json({ message: "Email sent successfully!" });
         });
-
-
-
 
     } catch (error) {
         console.error("Error sending email:", error);
