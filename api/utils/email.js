@@ -23,22 +23,33 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
 // Email Template Function
 const generateEmailTemplate = (studentName, courseToTake) => {
     return `
-        <h2>Hello ${studentName},</h2>
-        <p>Welcome to Cavite State University - Tanza Campus! We are glad to have you.</p>
-        <p>You may now proceed to the school and register for your courses.</p>
-        <p>Please note that you will need to provide your student account to access your courses.</p>
+        <h2>Dear ${studentName},</h2>
+
+        <p>We are pleased to welcome you to <strong>Cavite State University - Tanza Campus</strong>. We are delighted to have you join our academic community.</p>
+
+        <p>You may now proceed to the campus to finalize your registration. Kindly ensure that you bring the necessary documents and provide your student account credentials to access your courses.</p>
+
         <br>
-        <p>Below is the list of courses you have registered for:</p>
+
+        <p><strong>The following courses have been successfully enrolled for you:</strong></p>
         <ul>
             ${courseToTake.map((course) => `
-                <li>${course.courseName} - ${course.courseCode}</li>
+                <li><strong>${course.courseName}</strong> (${course.courseCode})</li>
             `).join('')}
         </ul>
+
         <br>
-        <p>Best Regards,</p>
-        <p>Your Organization Team</p>
+
+        <p>Should you have any questions or require further assistance, please feel free to reach out to the registration office.</p>
+
+        <br>
+
+        <p>Best regards,</p>
+        <p><strong>Office of the Registrar</strong></p>
+        <p>Cavite State University - Tanza Campus</p>
     `;
 };
+
 
 
 const generateEmailTemplateInvalidCredentials = (studentName) => {
