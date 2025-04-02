@@ -375,11 +375,11 @@ exports.currentInQueue = async (req, res) => {
         }
 
         const currentQueue = await Queue.find({ destination, status: 'Waiting' })
-            .sort({ createdAt: 1 })
+            .sort({ priority: -1, createdAt: 1 }) // Prioritize priority=true, then by creation time
             .populate('courseToTake', 'name code unit course description')
             .populate('student', 'firstName lastName course year section username email isRegular');
 
-        if (!currentQueue) {
+        if (!currentQueue || currentQueue.length === 0) {
             return res.status(404).json({ message: 'No queue at this destination' });
         }
 
@@ -390,8 +390,10 @@ exports.currentInQueue = async (req, res) => {
     }
 };
 
+
 exports.updateQueue = async (req, res) => {
     try {
+        console.log("here", req.body)
 
         const queueId = await req.params.id;
         const updateFields = await req.body;

@@ -10,6 +10,7 @@ const queueSchema = mongoose.Schema({
     status: { type: String, required: true, default: 'Waiting' },
     estimatedTime: { type: Number, required: true },
 
+    priority: { type: Boolean, default: false },
     destination: { type: String, required: true },
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
