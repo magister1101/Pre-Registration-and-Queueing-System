@@ -236,6 +236,90 @@ exports.getUser = async (req, res) => {
     }
 };
 
+exports.deleteUser = async (req, res) => {
+    try {
+        const { query, role, program, year, emailed, isArchived } = req.query;
+
+        const escapeRegex = (value) => {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        let deleteCriteria = {};
+        const queryConditions = [];
+
+        if (role) {
+            const escapedRole = escapeRegex(role);
+            queryConditions.push({
+                role: { $regex: escapedRole, $options: 'i' }
+            });
+        }
+
+        if (program) {
+            const escapedProgram = escapeRegex(program);
+            queryConditions.push({
+                course: { $regex: escapedProgram, $options: 'i' }
+            });
+        }
+
+        if (year) {
+            const escapedYear = escapeRegex(year);
+            queryConditions.push({
+                year: { $regex: escapedYear, $options: 'i' }
+            });
+        }
+
+        if (emailed) {
+            const escapedEmailed = escapeRegex(emailed);
+            queryConditions.push({
+                email: { $regex: escapedEmailed, $options: 'i' }
+            });
+        }
+
+        if (query) {
+            const escapedQuery = escapeRegex(query);
+            const orConditions = [];
+
+            if (mongoose.Types.ObjectId.isValid(query)) {
+                orConditions.push({ _id: query });
+            }
+
+            orConditions.push(
+                { firstName: { $regex: escapedQuery, $options: 'i' } },
+                { lastName: { $regex: escapedQuery, $options: 'i' } },
+                { middleName: { $regex: escapedQuery, $options: 'i' } },
+                { email: { $regex: escapedQuery, $options: 'i' } },
+                { username: { $regex: escapedQuery, $options: 'i' } }
+            );
+
+            queryConditions.push({ $or: orConditions });
+        }
+
+        if (isArchived) {
+            const isArchivedBool = isArchived === 'true';
+            queryConditions.push({ isArchived: isArchivedBool });
+        }
+
+        if (queryConditions.length > 0) {
+            deleteCriteria = { $and: queryConditions };
+        }
+
+        const result = await User.deleteMany(deleteCriteria);
+
+        return res.status(200).json({
+            message: 'Users deleted successfully',
+            deletedCount: result.deletedCount
+        });
+
+    } catch (error) {
+        console.error('Error deleting users:', error);
+        return res.status(500).json({
+            message: 'Error in deleting users',
+            error: error.message || error
+        });
+    }
+};
+
+
 exports.myProfile = async (req, res) => {
     try {
         User.findOne({ _id: req.userData.userId })

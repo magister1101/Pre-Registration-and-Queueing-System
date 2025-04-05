@@ -25,6 +25,8 @@ router.post('/sendEmail/:id', UsersController.sendEmail);
 
 router.post('/rejectEmail/:id', UsersController.sendEmailReject);
 
+router.delete('/delete', UsersController.deleteUser)
+
 
 
 
