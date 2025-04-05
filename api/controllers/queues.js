@@ -380,7 +380,12 @@ exports.currentInQueue = async (req, res) => {
             .populate('student', 'firstName lastName course year section username email isRegular');
 
         if (!currentQueue || currentQueue.length === 0) {
-            return res.status(404).json({ message: 'No queue at this destination' });
+            return res.status(200).json({
+                currentQueue: {
+                    message: 'No queue at this destination',
+                    queueNumber: "None"
+                }
+            });
         }
 
         return res.status(200).json({ currentQueue });
