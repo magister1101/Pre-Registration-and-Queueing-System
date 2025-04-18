@@ -23,6 +23,8 @@ router.post('/login', UsersController.loginUser);
 
 router.post('/sendEmail/:id', UsersController.sendEmail);
 
+router.post('/enrollRegular/:id', UsersController.enrollRegular)
+
 router.post('/rejectEmail/:id', UsersController.sendEmailReject);
 
 router.delete('/delete', UsersController.deleteUser)

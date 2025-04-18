@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 const Course = require('../models/course');
 const Program = require('../models/program');
+const Semester = require('../models/semester');
 
 const performUpdate = (id, updateFields, res) => {
     Course.findByIdAndUpdate(id, updateFields, { new: true })
@@ -235,6 +236,7 @@ exports.createCourse = async (req, res) => {
             code: req.body.code,
             unit: req.body.unit,
             year: req.body.year,
+            semester: req.body.semester,
             course: req.body.course,
             description: req.body.description,
             prerequisite: req.body.prerequisite,
@@ -323,3 +325,75 @@ exports.updateCourse = async (req, res) => {
         });
     }
 };
+
+exports.getSemester = async (req, res) => {
+    try {
+        const semseter = await Semester.find();
+        if (semseter.length === 0) {
+            const newSemester = new Semester({
+                _id: new mongoose.Types.ObjectId(),
+                Semester: 'first'
+            })
+            const saveSemester = await newSemester.save();
+            return res.status(201).json({
+                message: "Semester created successfully",
+                semester: saveSemester
+            });
+        }
+
+        return res.status(200).json(semseter);
+
+    }
+    catch (error) {
+        console.error('Error retrieving semester:', error);
+        return res.status(500).json({
+            message: "Error in retrieving semester",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.changeSemester = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const oldSemester = await Semester.findById(id);
+
+        if (!oldSemester) {
+            return res.status(404).json({ message: "Semester not found" });
+        }
+
+        let newSemester;
+
+        switch (oldSemester.semester) {
+            case 'First':
+                newSemester = 'Second';
+                break;
+            case 'Second':
+                newSemester = 'Summer';
+                break;
+            case 'Summer':
+                newSemester = 'First';
+                break;
+            default:
+                return res.status(400).json({ message: "Invalid current semester value" });
+        }
+
+        oldSemester.semester = newSemester;
+        const updatedSemester = await oldSemester.save();
+
+        return res.status(200).json({
+            message: "Semester changed successfully",
+            semester: updatedSemester
+        });
+
+    } catch (err) {
+        console.error('Error changing semester:', err);
+        return res.status(500).json({
+            message: "Error in changing semester",
+            error: err.message || err,
+        });
+    }
+};
+
+
+

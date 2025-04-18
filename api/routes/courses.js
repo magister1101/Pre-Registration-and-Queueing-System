@@ -12,9 +12,13 @@ router.get('/getProgram', CoursesController.getProgram);
 
 router.get('/getPrerequisite', CoursesController.getPrerequisite);
 
+router.get('/getSemester', CoursesController.getSemester)
+
 router.post('/createCourse', CoursesController.createCourse);
 
 router.post('/createProgram', CoursesController.createProgram);
+
+router.post('/changeSemester/:id', CoursesController.changeSemester)
 
 router.post('/updateProgram/:programId', CoursesController.updateProgram);
 

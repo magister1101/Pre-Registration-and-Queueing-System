@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { transporter, generateEmailTemplate, generateEmailTemplateInvalidCredentials } = require('../utils/email');
 
 const User = require('../models/user');
+const Course = require('../models/course');
 
 
 exports.sendEmail = async (req, res) => {
@@ -502,3 +503,54 @@ exports.updateUser = async (req, res, next) => {
         });
     }
 };
+
+exports.enrollRegular = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+        const semester = req.body.semester;
+
+        if (!user) {
+            console.log('User not found')
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (!user.isRegular) {
+            console.log('User is not marked as a regular student')
+            return res.status(400).json({ message: 'User is not marked as a regular student' });
+        }
+
+        if (!user.course || !user.year || !semester) {
+            console.log('Missing course, year, or semester information in user profile')
+            return res.status(400).json({ message: 'Missing course, year, or semester information in user profile' });
+        }
+
+        // Find matching courses based on course, year, and semester
+        const matchingCourses = await Course.find({
+            course: user.course,
+            year: user.year,
+            semester: semester,
+        });
+
+        console.log(user.course, user.year, semester)
+        console.log(matchingCourses)
+
+        if (!matchingCourses.length) {
+            console.log('No matching courses found')
+            return res.status(404).json({ message: 'No matching courses found' });
+        }
+
+        // Assign courseToTake
+        user.courseToTake = matchingCourses.map(course => course._id.toString());
+        await user.save();
+
+        res.status(200).json({
+            message: 'Courses assigned successfully',
+            courseToTake: user.courseToTake
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+}
+
