@@ -14,7 +14,7 @@ const userSchema = mongoose.Schema({
     role: { type: String, required: true, default: "student" }, //student, instructor, admin
     group: { type: String }, //if instructor this is the department
 
-    courses: [{ type: String, ref: 'Course' }], //if student this is the courses taken
+    courses: [{ courseId: {type: String, ref: 'Course'}, grade: {type: Number} }], //if student this is the courses taken
     courseToTake: [{ type: String, ref: 'Course' }], //if student this is the courses to take
 
     studentNumber: { type: String, unique: true },

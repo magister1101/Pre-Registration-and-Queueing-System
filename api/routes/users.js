@@ -2,8 +2,13 @@ const express = require('express');
 const router = express.Router();
 const checkAuth = require('../middleware/check-auth');
 
+const multer = require('multer');
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+
 const UsersController = require('../controllers/users');
-const user = require('../models/user');
+
 
 //routes
 
@@ -27,8 +32,9 @@ router.post('/enrollRegular/:id', UsersController.enrollRegular)
 
 router.post('/rejectEmail/:id', UsersController.sendEmailReject);
 
-router.delete('/delete', UsersController.deleteUser)
+router.post('/excel/insertStudents', upload.single('file'), UsersController.insertStudents);
 
+router.delete('/delete', UsersController.deleteUser);
 
 
 

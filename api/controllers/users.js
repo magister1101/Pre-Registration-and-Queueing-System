@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const xlsx = require('xlsx');
 
 const { transporter, generateEmailTemplate, generateEmailTemplateInvalidCredentials } = require('../utils/email');
 
@@ -320,7 +321,6 @@ exports.deleteUser = async (req, res) => {
     }
 };
 
-
 exports.myProfile = async (req, res) => {
     try {
         User.findOne({ _id: req.userData.userId })
@@ -552,5 +552,92 @@ exports.enrollRegular = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Internal server error', error: error.message });
     }
-}
+};
+
+exports.insertStudents = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded.' });
+        }
+
+        const workbook = xlsx.read(req.file.buffer); // Use file buffer for processing
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = xlsx.utils.sheet_to_json(sheet);
+
+        // Process rows from Excel
+        for (const row of rows) {
+            const {
+                studentNumber,
+                email,
+                firstName,
+                lastName,
+                middleName,
+                course,
+                year,
+                section,
+                isRegular,
+                isArchived,
+                role = 'student'
+            } = row;
+
+            if (!studentNumber || !email || !firstName || !lastName) {
+                continue; // Skip incomplete rows
+            }
+
+            const courses = [];
+
+            for (const key of Object.keys(row)) {
+                if (![
+                    'studentNumber', 'email', 'firstName', 'lastName',
+                    'middleName', 'course', 'year', 'section',
+                    'isRegular', 'isArchived', 'role'
+                ].includes(key)) {
+                    const grade = row[key];
+                    if (grade !== undefined && grade !== '') {
+                        // Find the course by courseCode (key)
+                        const courseData = await Course.findOne({ code: key, isArchived: false });
+                        if (courseData) {
+                            // Store courseId and grade in the courses array
+                            courses.push({
+                                courseId: courseData._id,
+                                grade: parseFloat(grade)
+                            });
+                        }
+                    }
+                }
+            }
+
+            const hashedPassword = await bcrypt.hash(studentNumber, 10);
+
+            const update = {
+                username: studentNumber,
+                password: hashedPassword,
+                email,
+                firstName,
+                lastName,
+                middleName,
+                role,
+                studentNumber,
+                course,
+                year,
+                section,
+                isRegular,
+                isArchived,
+                courses
+            };
+
+            await User.findOneAndUpdate(
+                { studentNumber },
+                { $set: update },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+        }
+
+        res.json({ message: 'Students imported successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
 
