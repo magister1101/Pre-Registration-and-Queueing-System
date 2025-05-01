@@ -402,7 +402,7 @@ exports.loginUser = async (req, res, next) => {
                         message: 'Auth Failed (UserName Not found)'
                     });
                 }
-                if (user[0].isEmailSent && !user[0].isArchived) {
+                if (!user[0].isArchived) {
                     bcrypt.compare(req.body.password, user[0].password, (err, result) => {
                         if (err) {
                             return res.status(401).json({
