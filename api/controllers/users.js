@@ -576,7 +576,7 @@ exports.insertStudents = async (req, res) => {
                 year,
                 section,
                 isRegular,
-                isArchived,
+                isArchived = 'false',
                 role = 'student'
             } = row;
 
