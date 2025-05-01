@@ -572,7 +572,7 @@ exports.insertStudents = async (req, res) => {
                 firstName,
                 lastName,
                 middleName,
-                course,
+                program,
                 year,
                 section,
                 isRegular,
@@ -589,7 +589,7 @@ exports.insertStudents = async (req, res) => {
             for (const key of Object.keys(row)) {
                 if (![
                     'studentNumber', 'email', 'firstName', 'lastName',
-                    'middleName', 'course', 'year', 'section',
+                    'middleName', 'program', 'year', 'section',
                     'isRegular', 'isArchived', 'role'
                 ].includes(key)) {
                     const grade = row[key];
@@ -617,7 +617,7 @@ exports.insertStudents = async (req, res) => {
                 middleName,
                 role,
                 studentNumber,
-                course,
+                course: program,
                 year,
                 section,
                 isRegular,
