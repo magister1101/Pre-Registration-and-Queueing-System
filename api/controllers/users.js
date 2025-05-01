@@ -224,7 +224,7 @@ exports.getUser = async (req, res) => {
             searchCriteria = { $and: queryConditions };
         }
         const users = await User.find(searchCriteria)
-            .populate('courses', 'name code')
+            .populate('courses.courseId', 'name code')
             .sort({ createdAt: -1 });
 
         return res.status(200).json(users);
@@ -560,7 +560,7 @@ exports.insertStudents = async (req, res) => {
             return res.status(400).json({ error: 'No file uploaded.' });
         }
 
-        const workbook = xlsx.read(req.file.buffer); // Use file buffer for processing
+        const workbook = xlsx.read(req.file.buffer);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = xlsx.utils.sheet_to_json(sheet);
 
@@ -597,7 +597,6 @@ exports.insertStudents = async (req, res) => {
                         // Find the course by courseCode (key)
                         const courseData = await Course.findOne({ code: key, isArchived: false });
                         if (courseData) {
-                            // Store courseId and grade in the courses array
                             courses.push({
                                 courseId: courseData._id,
                                 grade: parseFloat(grade)
