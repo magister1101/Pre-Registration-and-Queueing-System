@@ -7,6 +7,7 @@ const { transporter, generateEmailTemplate, generateEmailTemplateInvalidCredenti
 
 const User = require('../models/user');
 const Course = require('../models/course');
+const Semester = require('../models/semester');
 
 
 exports.sendEmail = async (req, res) => {
@@ -564,7 +565,11 @@ exports.insertStudents = async (req, res) => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = xlsx.utils.sheet_to_json(sheet);
 
-        // Process rows from Excel
+        const currentSemester = await Semester.findOne();
+        if (!currentSemester) {
+            return res.status(400).json({ error: 'No active semester found.' });
+        }
+
         for (const row of rows) {
             const {
                 studentNumber,
@@ -580,11 +585,10 @@ exports.insertStudents = async (req, res) => {
                 role = 'student'
             } = row;
 
-            if (!studentNumber || !email || !firstName || !lastName) {
-                continue; // Skip incomplete rows
-            }
+            if (!studentNumber || !email || !firstName || !lastName) continue;
 
             const courses = [];
+            let hasInvalidGrade = false;
 
             for (const key of Object.keys(row)) {
                 if (![
@@ -592,21 +596,70 @@ exports.insertStudents = async (req, res) => {
                     'middleName', 'program', 'year', 'section',
                     'isRegular', 'isArchived', 'role'
                 ].includes(key)) {
-                    const grade = row[key];
-                    if (grade !== undefined && grade !== '') {
-                        // Find the course by courseCode (key)
-                        const courseData = await Course.findOne({ code: key, isArchived: false });
-                        if (courseData) {
-                            courses.push({
-                                courseId: courseData._id,
-                                grade: parseFloat(grade)
-                            });
-                        }
+                    const grade = parseFloat(row[key]);
+
+                    if (isNaN(grade)) continue;
+                    if (grade === 0 || grade > 3) {
+                        hasInvalidGrade = true;
+                    }
+
+                    const courseData = await Course.findOne({ code: key, isArchived: false });
+                    if (courseData) {
+                        courses.push({
+                            courseId: courseData._id,
+                            grade
+                        });
                     }
                 }
             }
 
-            const hashedPassword = await bcrypt.hash(studentNumber, 10);
+            const studentName = `${firstName} ${middleName ? middleName + " " : ""}${lastName}`;
+
+            // If grade is 0 or > 3, send notice email and save courses with grades
+            if (hasInvalidGrade) {
+                const mailOptions = {
+                    from: process.env.EMAIL_USER,
+                    replyTo: process.env.EMAIL_USER,
+                    to: email,
+                    subject: "Grade Concern - Cavite State University",
+                    text: `Hi ${studentName},\n\nOne or more of your grades are either failing (above 3.0) or invalid (0). Please visit the university registrar to resolve this issue before enrollment.`,
+                    html: `<p>Hi <strong>${studentName}</strong>,</p><p>One or more of your grades are either <strong>failing (above 3.0)</strong> or <strong>invalid (0)</strong>. Please visit the university registrar to resolve this issue before enrollment.</p>`
+                };
+
+                await transporter.sendMail(mailOptions);
+                console.log(`Grade issue email sent to ${studentNumber}`);
+
+                const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
+
+                const update = {
+                    username: studentNumber,
+                    password: hashedPassword,
+                    email,
+                    firstName,
+                    lastName,
+                    middleName,
+                    role,
+                    studentNumber,
+                    course: program,
+                    year,
+                    section,
+                    isRegular: isRegular === true || isRegular === 'true',
+                    isArchived: isArchived === true || isArchived === 'true',
+                    courses,  // Save courses and grades
+                    isEmailSent: true,
+                    courseToTake: []  // Don't assign courses to courseToTake
+                };
+
+                await User.findOneAndUpdate(
+                    { studentNumber },
+                    { $set: update },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+                continue;
+            }
+
+            //if grade is valid then proceed with regular enrollment 
+            const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
 
             const update = {
                 username: studentNumber,
@@ -620,23 +673,86 @@ exports.insertStudents = async (req, res) => {
                 course: program,
                 year,
                 section,
-                isRegular,
-                isArchived,
+                isRegular: isRegular === true || isRegular === 'true',
+                isArchived: isArchived === true || isArchived === 'true',
                 courses
             };
 
-            await User.findOneAndUpdate(
+            const user = await User.findOneAndUpdate(
                 { studentNumber },
                 { $set: update },
                 { upsert: true, new: true, setDefaultsOnInsert: true }
             );
+
+            if (user.isRegular) {
+                const matchingCourses = await Course.find({
+                    course: user.course,
+                    year: user.year,
+                    semester: currentSemester.semester
+                });
+
+                if (matchingCourses.length) {
+                    user.courseToTake = matchingCourses.map(course => course._id.toString());
+                    await user.save();
+
+                    const formattedCourses = matchingCourses.map(course => ({
+                        courseName: course.name || "Unknown",
+                        courseCode: course.code || "-"
+                    }));
+
+                    const mailOptions = {
+                        from: process.env.EMAIL_USER,
+                        replyTo: process.env.EMAIL_USER,
+                        to: email,
+                        subject: "Your Enrollment - Cavite State University",
+                        text: generateEmailTemplate(studentName, formattedCourses),
+                        html: generateEmailTemplate(studentName, formattedCourses)
+                    };
+
+                    await User.findByIdAndUpdate(user._id, { isEmailSent: true });
+
+                    transporter.sendMail(mailOptions, (err, info) => {
+                        if (err) {
+                            console.error(`Email Error (Regular): ${studentNumber}`, err);
+                        } else {
+                            console.log(`Enrollment email sent to ${studentNumber}:`, info.response);
+                        }
+                    });
+                } else {
+                    console.log(`No matching courses found for ${studentNumber}`);
+                }
+            } else {
+                const mailOptions = {
+                    from: process.env.EMAIL_USER,
+                    replyTo: process.env.EMAIL_USER,
+                    to: email,
+                    subject: "Enrollment Notice - Cavite State University",
+                    text: `Hi ${studentName},\n\nYou are currently marked as an irregular student. Please visit the university to discuss your enrollment for this semester.`,
+                    html: `<p>Hi <strong>${studentName}</strong>,</p><p>You are currently marked as an <strong>irregular student</strong>. Please visit the university to discuss your enrollment for this semester.</p>`
+                };
+
+                await User.findByIdAndUpdate(user._id, { isEmailSent: true });
+
+                transporter.sendMail(mailOptions, (err, info) => {
+                    if (err) {
+                        console.error(`Email Error (Irregular): ${studentNumber}`, err);
+                    } else {
+                        console.log(`Irregular notice email sent to ${studentNumber}:`, info.response);
+                    }
+                });
+            }
         }
 
-        res.json({ message: 'Students imported successfully.' });
+        res.json({ message: 'Students processed successfully.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };
+
+
+
+
+
 
 

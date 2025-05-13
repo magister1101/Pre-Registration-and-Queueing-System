@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
 // Debugging - Ensure credentials are loaded
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
 
-    console.error("⚠️ Missing EMAIL_USER or EMAIL_PASS in environment variables.");
+    console.error("Missing EMAIL_USER or EMAIL_PASS in environment variables.");
 }
 
 // Email Template Function
