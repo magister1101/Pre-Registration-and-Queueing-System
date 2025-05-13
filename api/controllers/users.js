@@ -555,7 +555,7 @@ exports.enrollRegular = async (req, res) => {
     }
 };
 
-exports.insertStudents = async (req, res) => {
+exports.insertStudent_W = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded.' });
@@ -744,6 +744,156 @@ exports.insertStudents = async (req, res) => {
         }
 
         res.json({ message: 'Students processed successfully.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+exports.insertStudents = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded.' });
+        }
+
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = xlsx.utils.sheet_to_json(sheet);
+
+        const currentSemester = await Semester.findOne();
+        if (!currentSemester) {
+            return res.status(400).json({ error: 'No active semester found.' });
+        }
+
+        for (const row of rows) {
+            const {
+                studentNumber,
+                email,
+                firstName,
+                lastName,
+                middleName,
+                program,
+                year,
+                section,
+                isArchived = 'false',
+                role = 'student'
+            } = row;
+
+            if (!studentNumber || !email || !firstName || !lastName) {
+                continue; // Skip incomplete rows
+            }
+
+            let hasInvalidGrade = false;
+            const courses = [];
+
+            for (const key of Object.keys(row)) {
+                if (![
+                    'studentNumber', 'email', 'firstName', 'lastName',
+                    'middleName', 'program', 'year', 'section',
+                    'isRegular', 'isArchived', 'role'
+                ].includes(key)) {
+                    const grade = parseFloat(row[key]);
+                    if (isNaN(grade)) continue;
+
+                    if (grade === 0 || grade > 3) hasInvalidGrade = true;
+
+                    const courseData = await Course.findOne({ code: key, isArchived: false });
+                    if (courseData) {
+                        courses.push({
+                            courseId: courseData._id,
+                            grade
+                        });
+                    }
+                }
+            }
+
+            const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
+            const studentName = `${firstName} ${middleName ? middleName + " " : ""}${lastName}`;
+
+            const update = {
+                username: studentNumber,
+                password: hashedPassword,
+                email,
+                firstName,
+                lastName,
+                middleName,
+                role,
+                studentNumber,
+                course: program,
+                year,
+                section,
+                isRegular: !hasInvalidGrade,
+                isArchived: isArchived === true || isArchived === 'true',
+                courses,
+                courseToTake: [],
+                isEmailSent: true
+            };
+
+            const user = await User.findOneAndUpdate(
+                { studentNumber },
+                { $set: update },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+
+            if (hasInvalidGrade) {
+                const mailOptions = {
+                    from: process.env.EMAIL_USER,
+                    replyTo: process.env.EMAIL_USER,
+                    to: email,
+                    subject: "Grade Concern - Cavite State University",
+                    text: `Hi ${studentName},\n\nYou have a failing (above 3.0) or invalid (0) grade. Please visit the registrar to discuss your enrollment.`,
+                    html: `<p>Hi <strong>${studentName}</strong>,</p><p>You have a <strong>failing (above 3.0)</strong> or <strong>invalid (0)</strong> grade. Please visit the university registrar to discuss your enrollment.</p>`
+                };
+
+                transporter.sendMail(mailOptions, (err, info) => {
+                    if (err) {
+                        console.error(`Email Error (Invalid Grade): ${studentNumber}`, err);
+                    } else {
+                        console.log(`Grade issue email sent to ${studentNumber}:`, info.response);
+                    }
+                });
+
+                continue; // Skip courseToTake/enrollment
+            }
+
+            // If regular, proceed to enroll courses
+            const matchingCourses = await Course.find({
+                course: user.course,
+                year: user.year,
+                semester: currentSemester.semester
+            });
+
+            if (matchingCourses.length) {
+                user.courseToTake = matchingCourses.map(course => course._id.toString());
+                await user.save();
+
+                const formattedCourses = matchingCourses.map(course => ({
+                    courseName: course.name || "Unknown",
+                    courseCode: course.code || "-"
+                }));
+
+                const mailOptions = {
+                    from: process.env.EMAIL_USER,
+                    replyTo: process.env.EMAIL_USER,
+                    to: email,
+                    subject: "Your Enrollment - Cavite State University",
+                    text: generateEmailTemplate(studentName, formattedCourses),
+                    html: generateEmailTemplate(studentName, formattedCourses)
+                };
+
+                transporter.sendMail(mailOptions, (err, info) => {
+                    if (err) {
+                        console.error(`Email Error (Regular): ${studentNumber}`, err);
+                    } else {
+                        console.log(`Enrollment email sent to ${studentNumber}:`, info.response);
+                    }
+                });
+            } else {
+                console.log(`No matching courses found for ${studentNumber}`);
+            }
+        }
+
+        res.json({ message: 'Students imported and processed successfully.' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal Server Error' });
