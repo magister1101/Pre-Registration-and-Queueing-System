@@ -118,7 +118,7 @@ exports.checkPrerequisites = async (req, res) => {
             return res.status(404).json({ message: 'Student not found' });
         }
 
-        const studentCourses = student.courses || [];
+        const studentCourseIds = student.courses.map(c => c.courseId);
         let missingPrerequisites = {};
         let metCourses = [];
         let alreadyTakenCourses = [];
@@ -126,7 +126,7 @@ exports.checkPrerequisites = async (req, res) => {
         for (let courseId of selectedCourses) {
             if (!mongoose.Types.ObjectId.isValid(courseId)) continue;
 
-            if (studentCourses.includes(courseId)) {
+            if (studentCourseIds.includes(courseId)) {
                 const takenCourse = await Course.findById(courseId);
                 if (takenCourse) {
                     alreadyTakenCourses.push({ id: takenCourse._id, name: takenCourse.name });
@@ -139,7 +139,7 @@ exports.checkPrerequisites = async (req, res) => {
 
             const missing = [];
             for (let prereqId of course.prerequisite) {
-                if (!studentCourses.includes(prereqId)) {
+                if (!studentCourseIds.includes(prereqId.toString())) {
                     const prereqCourse = await Course.findById(prereqId);
                     if (prereqCourse) {
                         missing.push({ id: prereqCourse._id, name: prereqCourse.name });
@@ -170,20 +170,15 @@ exports.checkPrerequisites = async (req, res) => {
             });
         }
 
-        User.findByIdAndUpdate(studentId, { courseToTake: selectedCourses }, { new: true })
-            .then((updatedUser) => {
-                if (!updatedUser) {
-                    return ({ message: "User not found" });
-                }
-                return updatedUser;
+        const updatedUser = await User.findByIdAndUpdate(
+            studentId,
+            { courseToTake: selectedCourses },
+            { new: true }
+        );
 
-            })
-            .catch((err) => {
-                return ({
-                    message: "Error in updating user",
-                    error: err
-                });
-            })
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found during update." });
+        }
 
         return res.status(200).json({
             missing: false,
