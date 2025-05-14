@@ -118,7 +118,12 @@ exports.checkPrerequisites = async (req, res) => {
             return res.status(404).json({ message: 'Student not found' });
         }
 
-        const studentCourseIds = student.courses.map(c => c.courseId);
+        const studentCourses = student.courses || [];
+        const passedCourseIds = studentCourses
+            .filter(c => c.grade <= 3 && c.grade !== 0)
+            .map(c => c.courseId);
+        const allCourseIdsTaken = studentCourses.map(c => c.courseId);
+
         let missingPrerequisites = {};
         let metCourses = [];
         let alreadyTakenCourses = [];
@@ -126,7 +131,7 @@ exports.checkPrerequisites = async (req, res) => {
         for (let courseId of selectedCourses) {
             if (!mongoose.Types.ObjectId.isValid(courseId)) continue;
 
-            if (studentCourseIds.includes(courseId)) {
+            if (allCourseIdsTaken.includes(courseId)) {
                 const takenCourse = await Course.findById(courseId);
                 if (takenCourse) {
                     alreadyTakenCourses.push({ id: takenCourse._id, name: takenCourse.name });
@@ -138,8 +143,9 @@ exports.checkPrerequisites = async (req, res) => {
             if (!course) continue;
 
             const missing = [];
-            for (let prereqId of course.prerequisite) {
-                if (!studentCourseIds.includes(prereqId.toString())) {
+
+            for (let prereqId of course.prerequisite) { 
+                if (!passedCourseIds.includes(prereqId.toString())) {
                     const prereqCourse = await Course.findById(prereqId);
                     if (prereqCourse) {
                         missing.push({ id: prereqCourse._id, name: prereqCourse.name });
@@ -165,7 +171,7 @@ exports.checkPrerequisites = async (req, res) => {
         if (Object.keys(missingPrerequisites).length > 0) {
             return res.status(200).json({
                 missing: true,
-                message: 'Some prerequisites are missing.',
+                message: 'Some prerequisites are missing or failed.',
                 missingPrerequisites
             });
         }
@@ -284,7 +290,6 @@ exports.createTransaction = async (req, res) => {
     }
 };
 
-
 exports.nextInQueue = async (req, res) => {
     try {
         const { queueId } = req.params;
@@ -389,7 +394,6 @@ exports.currentInQueue = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
-
 
 exports.updateQueue = async (req, res) => {
     try {
