@@ -27,7 +27,7 @@ const generateEmailTemplate = (studentName, courseToTake) => {
 
         <p>We are pleased to welcome you to <strong>Cavite State University - Tanza Campus</strong>. We are delighted to have you join our academic community.</p>
 
-        <p>You may now proceed to the campus to finalize your registration. Kindly ensure that you bring the necessary documents and provide your student account credentials to access your courses.</p>
+        <p>You may now proceed to the campus to finalize your registration. Kindly ensure that you bring the necessary documents and provide your student account credentials to access your courses. Your Username and Password shall be your Student number</p>
 
         <br>
 
