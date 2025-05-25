@@ -20,6 +20,8 @@ router.get('/tokenValidation', UsersController.tokenValidation);
 
 router.get('/resetQueue', checkAuth, UsersController.resetQueueCounter);
 
+router.get('/getTransactionLogs', UsersController.getTransactionLogs);
+
 router.post('/create', UsersController.createUser);
 
 router.post('/update/:userId', UsersController.updateUser);
@@ -33,6 +35,10 @@ router.post('/enrollRegular/:id', UsersController.enrollRegular)
 router.post('/rejectEmail/:id', UsersController.sendEmailReject);
 
 router.post('/excel/insertStudents', upload.single('file'), UsersController.insertStudents);
+
+router.post('/clockIn', UsersController.clockIn);
+
+router.post('/clockOut', UsersController.clockOut);
 
 router.delete('/delete', UsersController.deleteUser);
 

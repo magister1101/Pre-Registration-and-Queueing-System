@@ -8,6 +8,7 @@ const { transporter, generateEmailTemplate, generateEmailTemplateInvalidCredenti
 const User = require('../models/user');
 const Course = require('../models/course');
 const Semester = require('../models/semester');
+const TransactionLog = require('../models/transactionLog');
 
 
 exports.sendEmail = async (req, res) => {
@@ -900,7 +901,134 @@ exports.insertStudents = async (req, res) => {
     }
 };
 
+exports.clockIn = async (req, res) => {
+    const { userId } = req.body;
 
+    try {
+        const openSession = await TransactionLog.findOne({ userId, clockOut: null });
+        if (openSession) {
+            return res.status(400).json({ message: 'You must clock out first.' });
+        }
+
+        const newRecord = new TransactionLog({
+            userId,
+            clockIn: new Date()
+        });
+
+        await newRecord.save();
+        res.json({ message: 'Clocked in.', record: newRecord });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.clockOut = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const lastRecord = await TransactionLog.findOne({ userId, clockOut: null }).sort({ clockIn: -1 });
+
+        if (!lastRecord) {
+            return res.status(400).json({ message: 'No open clock-in found.' });
+        }
+
+        lastRecord.clockOut = new Date(); // Fixed: matches schema field
+        await lastRecord.save();
+
+        res.json({ message: 'Clocked out.', record: lastRecord });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.getTransactionLogs = async (req, res) => {
+    try {
+        const { query, filter, userId } = req.query;
+
+        const escapeRegex = (value) => {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        let searchCriteria = {};
+        const queryConditions = [];
+
+        if (query) {
+            const escapedQuery = escapeRegex(query);
+            const orConditions = [];
+
+            if (mongoose.Types.ObjectId.isValid(query)) {
+                orConditions.push({ _id: query });
+            }
+
+            orConditions.push(
+                { 'userId.firstName': { $regex: escapedQuery, $options: 'i' } },
+                { 'userId.lastName': { $regex: escapedQuery, $options: 'i' } },
+                { 'userId.middleName': { $regex: escapedQuery, $options: 'i' } },
+                { 'userId.email': { $regex: escapedQuery, $options: 'i' } },
+                { 'userId.username': { $regex: escapedQuery, $options: 'i' } },
+                { 'userId.role': { $regex: escapedQuery, $options: 'i' } }
+            );
+
+            queryConditions.push({ $or: orConditions });
+        }
+
+        if (filter) {
+            const escapedFilter = escapeRegex(filter);
+            queryConditions.push({
+                $or: [
+                    { userId: { $regex: escapedFilter, $options: 'i' } },
+                    { clockIn: { $regex: escapedFilter, $options: 'i' } },
+                    { clockOut: { $regex: escapedFilter, $options: 'i' } },
+                ]
+            });
+        }
+
+        if (userId) {
+            const escapedFilter = escapeRegex(userId);
+            queryConditions.push({
+                $or: [
+                    { userId: { $regex: escapedFilter, $options: 'i' } },
+                ]
+            });
+        }
+
+        if (queryConditions.length > 0) {
+            searchCriteria = { $and: queryConditions };
+        }
+
+        const logs = await TransactionLog.find(searchCriteria)
+            .populate('userId', 'firstName lastName middleName email username role')
+            .sort({ createdAt: -1 });
+
+        const logsWithDuration = logs.map(log => {
+            const clockIn = new Date(log.clockIn);
+            const clockOut = log.clockOut ? new Date(log.clockOut) : null;
+            let duration = null;
+
+            if (clockOut) {
+                const diffMs = clockOut - clockIn;
+                const totalSeconds = Math.floor(diffMs / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                duration = `${minutes}m ${seconds}s`;
+            }
+
+            return {
+                ...log.toObject(),
+                duration
+            };
+        });
+
+        return res.status(200).json(logsWithDuration);
+
+    } catch (error) {
+        console.error('Error retrieving transaction logs:', error);
+        return res.status(500).json({
+            message: "Error in retrieving transaction logs.",
+            error: error.message || error
+        });
+    }
+};
 
 
 
