@@ -7,7 +7,7 @@ const Counter = require('../models/counter');
 const { broadcastUpdate } = require('../../websocket'); // Import from websocket.js
 
 
-const destinations = ['registrar', 'osas', 'cashier'];
+const destinations = ['registrar', 'admission', 'cashier'];
 
 const performUpdate = (id, updateFields, res) => {
     Queue.findByIdAndUpdate(id, updateFields, { new: true })
@@ -144,7 +144,7 @@ exports.checkPrerequisites = async (req, res) => {
 
             const missing = [];
 
-            for (let prereqId of course.prerequisite) { 
+            for (let prereqId of course.prerequisite) {
                 if (!passedCourseIds.includes(prereqId.toString())) {
                     const prereqCourse = await Course.findById(prereqId);
                     if (prereqCourse) {
