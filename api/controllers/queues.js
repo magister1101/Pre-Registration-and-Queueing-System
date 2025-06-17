@@ -122,7 +122,10 @@ exports.checkPrerequisites = async (req, res) => {
         const passedCourseIds = studentCourses
             .filter(c => c.grade <= 3 && c.grade !== 0)
             .map(c => c.courseId);
-        const allCourseIdsTaken = studentCourses.map(c => c.courseId);
+        const allCourseGrades = {};
+        studentCourses.forEach(c => {
+            allCourseGrades[c.courseId.toString()] = c.grade;
+        });
 
         let missingPrerequisites = {};
         let metCourses = [];
@@ -131,7 +134,9 @@ exports.checkPrerequisites = async (req, res) => {
         for (let courseId of selectedCourses) {
             if (!mongoose.Types.ObjectId.isValid(courseId)) continue;
 
-            if (allCourseIdsTaken.includes(courseId)) {
+            const courseGrade = allCourseGrades[courseId];
+            if (courseGrade && courseGrade <= 3 && courseGrade !== 0) {
+                // Already passed the course, block it
                 const takenCourse = await Course.findById(courseId);
                 if (takenCourse) {
                     alreadyTakenCourses.push({ id: takenCourse._id, name: takenCourse.name });
@@ -163,7 +168,7 @@ exports.checkPrerequisites = async (req, res) => {
         if (alreadyTakenCourses.length > 0) {
             return res.status(200).json({
                 missing: true,
-                message: 'Some courses have already been taken.',
+                message: 'Some courses have already been passed and cannot be retaken.',
                 alreadyTakenCourses
             });
         }
@@ -198,6 +203,7 @@ exports.checkPrerequisites = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 
 exports.createQueue = async (req, res) => {
     try {
