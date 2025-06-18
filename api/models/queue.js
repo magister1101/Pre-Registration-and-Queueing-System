@@ -4,6 +4,8 @@ const queueSchema = mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
     queueNumber: { type: String, required: true },
 
+    subCategory: [{ type: String }],
+
     student: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     courseToTake: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
 

@@ -258,6 +258,7 @@ exports.createQueue = async (req, res) => {
 exports.createTransaction = async (req, res) => {
     try {
         const destination = req.body.destination;
+        const subCategory = req.body.subCategory;
 
         // Find and increment the counter
         const counter = await Counter.findOneAndUpdate(
@@ -266,7 +267,7 @@ exports.createTransaction = async (req, res) => {
             { new: true, upsert: true }
         );
 
-        const queueNumber = `Q-${counter.value}`;
+        const queueNumber = `${counter.value}`;
 
         // Count waiting queues
         const waitingQueues = await Queue.countDocuments({ status: 'Waiting' });
@@ -279,9 +280,12 @@ exports.createTransaction = async (req, res) => {
             _id: new mongoose.Types.ObjectId(),
             queueNumber,
             destination,
+            subCategory,
             status: 'Waiting',
             estimatedTime
         });
+
+        console.log(newQueue)
 
         await newQueue.save();
 
@@ -319,7 +323,7 @@ exports.nextInQueue = async (req, res) => {
             queue.isArchived = true;
         } else {
             queue.destination = destinations[currentIndex + 1];
-            queue.queueNumber = `Q-${Date.now()}`;
+            queue.queueNumber = `${Date.now()}`;
         }
 
         await queue.save();
@@ -398,6 +402,19 @@ exports.currentInQueue = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
+    }
+};
+
+exports.resetQueues = async (req, res) => {
+    try {
+        await Counter.updateMany({}, { value: 0 });
+
+        await Queue.updateMany({ status: { $ne: 'Done' } }, { status: 'Done' });
+
+        return res.status(200).json({ message: 'Queues reset and counters set to 0 successfully.' });
+    } catch (err) {
+        console.error('Error resetting queues:', err);
+        return res.status(500).json({ message: 'An error occurred while resetting queues and counters.' });
     }
 };
 
