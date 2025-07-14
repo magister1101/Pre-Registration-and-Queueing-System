@@ -50,11 +50,24 @@ const generateEmailTemplate = (studentName, courseToTake) => {
     `;
 };
 
+const customEmailtemplate = (studentName, date, message) => {
+    return `
+        <h2>Dear ${studentName},</h2>
+        <p>${message}</p>
+        <p>Please note that your registration for the following courses will be held on ${date}.</p>
+        <br>
+        <p>Best regards,</p>
+        <p><strong>Office of the Registrar</strong></p>
+        <p>Cavite State University - Tanza Campus</p>
+
+        `;
+}
+
 
 
 const generateEmailTemplateInvalidCredentials = (studentName) => {
     return `
-        <h2>Hello ${studentName},</h2>
+        < h2 > Hello ${studentName},</ >
         <p>We noticed that you attempted to register courses you have not taken.</p>
         <p>Please double-check the courses you have registered for and try to register again.</p>
         <p>If you continue to misinput your courses, you will be unable to enroll in your courses.</p>
@@ -70,4 +83,5 @@ module.exports = {
     transporter,
     generateEmailTemplate,
     generateEmailTemplateInvalidCredentials,
+    customEmailtemplate
 };
