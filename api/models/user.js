@@ -14,7 +14,7 @@ const userSchema = mongoose.Schema({
     role: { type: String, required: true, default: "student" }, //student, instructor, admin
     group: { type: String }, //if instructor this is the department
 
-    courses: [{ courseId: {type: String, ref: 'Course'}, grade: {type: Number} }], //if student this is the courses taken
+    courses: [{ courseId: { type: String, ref: 'Course' }, grade: { type: Number } }], //if student this is the courses taken
     courseToTake: [{ type: String, ref: 'Course' }], //if student this is the courses to take
 
     studentNumber: { type: String, unique: true },
@@ -31,6 +31,9 @@ const userSchema = mongoose.Schema({
     transferredQueue: { type: Number, default: 0 },
 
     isRegular: { type: Boolean },
+    isApproved: { type: Boolean, default: false },
+    isEnrolled: { type: Boolean, default: false },
+
     isEmailSent: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },

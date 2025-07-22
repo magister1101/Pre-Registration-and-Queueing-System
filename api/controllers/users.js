@@ -372,13 +372,11 @@ exports.deleteUser = async (req, res) => {
 
 exports.myProfile = async (req, res) => {
     try {
-        User.findOne({ _id: req.userData.userId })
-            .exec()
-            .then(user => {
-                return res.status(200).json(user);
-            })
-    }
-    catch (error) {
+        const user = await User.findOne({ _id: req.userData.userId })
+            .populate('courseToTake', 'name code unit course description');
+
+        return res.status(200).json(user);
+    } catch (error) {
         console.error('Error retrieving user:', error);
         return res.status(500).json({
             message: "Error in retrieving user",
@@ -443,6 +441,7 @@ exports.createUser = async (req, res, next) => {
 
 exports.loginUser = async (req, res, next) => {
     try {
+        console.log(req.body)
         User.find({ username: req.body.username })
             .exec()
             .then(user => {
@@ -454,11 +453,13 @@ exports.loginUser = async (req, res, next) => {
                 if (!user[0].isArchived) {
                     bcrypt.compare(req.body.password, user[0].password, (err, result) => {
                         if (err) {
+
                             return res.status(401).json({
                                 message: 'Auth Failed (incorrect Password)'
                             });
                         }
                         if (result) {
+                            console.log("here")
                             const token = jwt.sign({
                                 userId: user[0]._id,
                                 username: user[0].username,
@@ -1247,10 +1248,6 @@ exports.insertStudents = async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };
-
-
-
-
 
 exports.clockIn = async (req, res) => {
     const { userId } = req.body;

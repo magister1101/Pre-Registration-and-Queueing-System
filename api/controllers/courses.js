@@ -41,7 +41,7 @@ const performUpdateProgram = (id, updateFields, res) => {
 
 exports.getCourse = async (req, res) => {
     try {
-        const { isArchived, query, filter, program } = req.query;
+        const { isArchived, query, filter, program, year, semester } = req.query;
 
         const escapeRegex = (value) => {
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -80,6 +80,24 @@ exports.getCourse = async (req, res) => {
             queryConditions.push({
                 $or: [
                     { course: { $regex: escapedProgram, $options: 'i' } },
+                ],
+            });
+        }
+
+        if (year) {
+            const escapedProgram = escapeRegex(year);
+            queryConditions.push({
+                $or: [
+                    { year: { $regex: escapedProgram, $options: 'i' } },
+                ],
+            });
+        }
+
+        if (semester) {
+            const escapedProgram = escapeRegex(semester);
+            queryConditions.push({
+                $or: [
+                    { semester: { $regex: escapedProgram, $options: 'i' } },
                 ],
             });
         }
