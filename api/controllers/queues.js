@@ -207,7 +207,7 @@ exports.checkPrerequisites = async (req, res) => {
 
 exports.createQueue = async (req, res) => {
     try {
-        const studentId = req.userData.userId;
+        const studentId = req.body.studentId;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
             return res.status(400).json({ message: 'Invalid student ID' });
@@ -219,13 +219,13 @@ exports.createQueue = async (req, res) => {
         }
 
         // Find and increment the counter
-        const counter = await Counter.findOneAndUpdate(
+        await Counter.findOneAndUpdate(
             { name: 'queueNumber' },
             { $inc: { value: 1 } },
             { new: true, upsert: true }
         );
 
-        const queueNumber = `Q-${counter.value}`;
+        const queueNumber = `Q-${student.studentNumber}`;
 
         // Count waiting queues
         const waitingQueues = await Queue.countDocuments({ status: 'Waiting' });
@@ -247,13 +247,12 @@ exports.createQueue = async (req, res) => {
         await newQueue.save();
         return res.status(201).json({ message: 'Queue created successfully', queue: newQueue });
 
-
-
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 
 exports.createTransaction = async (req, res) => {
     try {

@@ -12,7 +12,7 @@ router.get('/current/:destination', queueController.currentInQueue);
 
 router.get('/resetQueues', checkAuth, queueController.resetQueues)
 
-router.post('/createQueue', checkAuth, queueController.createQueue);
+router.post('/createQueue', queueController.createQueue);
 
 router.post('/createTransaction', queueController.createTransaction);
 

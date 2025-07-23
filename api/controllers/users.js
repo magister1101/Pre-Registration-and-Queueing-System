@@ -190,7 +190,7 @@ const performUpdate = (id, updateFields, res) => {
 
 exports.getUser = async (req, res) => {
     try {
-        const { isArchived, query, filter, emailed, role, program, year } = req.query;
+        const { isArchived, isEnrolled, isApproved, query, filter, emailed, role, program, year } = req.query;
 
         const escapeRegex = (value) => {
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -237,6 +237,8 @@ exports.getUser = async (req, res) => {
             });
         }
 
+
+
         if (year) {
             const escapedFilter = escapeRegex(year);
             queryConditions.push({
@@ -264,6 +266,15 @@ exports.getUser = async (req, res) => {
             });
         }
 
+        if (isEnrolled) {
+            const isEnrolledBool = isEnrolled === 'true'; // Convert to boolean
+            queryConditions.push({ isEnrolled: isEnrolledBool });
+        }
+        if (isApproved) {
+            const isApprovedBool = isApproved === 'true'; // Convert to boolean
+            queryConditions.push({ isApproved: isApprovedBool });
+        }
+
         if (isArchived) {
             const isArchivedBool = isArchived === 'true'; // Convert to boolean
             queryConditions.push({ isArchived: isArchivedBool });
@@ -274,6 +285,14 @@ exports.getUser = async (req, res) => {
         }
         const users = await User.find(searchCriteria)
             .populate('courses.courseId', 'name code')
+            .populate({
+                path: 'courseToTake',
+                select: 'name code unit course semester description prerequisite',
+                populate: {
+                    path: 'prerequisite',
+                    select: 'name code unit semester'
+                }
+            })
             .sort({ createdAt: -1 });
 
         return res.status(200).json(users);
