@@ -293,7 +293,15 @@ exports.getUser = async (req, res) => {
                     select: 'name code unit semester'
                 }
             })
-            .populate('schedule', 'code course day startTime endTime')
+            .populate('schedule', 'code section course day schedule')
+            .populate({
+                path: 'schedule',
+                select: 'code section course day schedule',
+                populate: {
+                    path: 'schedule',
+                    select: 'code section course schedule'
+                }
+            })
             .sort({ createdAt: -1 });
 
         return res.status(200).json(users);

@@ -451,7 +451,14 @@ exports.currentInQueue = async (req, res) => {
         const currentQueue = await Queue.find({ destination, status: 'Waiting' })
             .sort({ priority: -1, createdAt: 1 }) // Prioritize priority=true, then by creation time
             .populate('courseToTake', 'name code unit course description')
-            .populate('student', 'firstName lastName course year section username email isRegular');
+            .populate({
+                path: 'student',
+                select: 'firstName lastName course year section username email isRegular schedule',
+                populate: {
+                    path: 'schedule',
+                    select: 'code course section schedule'
+                }
+            });
 
         if (!currentQueue || currentQueue.length === 0) {
             return res.status(200).json({

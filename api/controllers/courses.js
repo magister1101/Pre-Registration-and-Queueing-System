@@ -5,6 +5,7 @@ const Course = require('../models/course');
 const Schedule = require('../models/schedule');
 const Program = require('../models/program');
 const Semester = require('../models/semester');
+const schedule = require('../models/schedule');
 
 
 const performUpdate = (id, updateFields, res) => {
@@ -128,7 +129,7 @@ exports.getCourse = async (req, res) => {
 
 exports.getSchedule = async (req, res) => {
     try {
-        const { isArchived, query, course, day } = req.query;
+        const { isArchived, query, course, schedule } = req.query;
 
         const escapeRegex = (value) => {
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -165,11 +166,11 @@ exports.getSchedule = async (req, res) => {
         }
 
 
-        if (day) {
-            const escapedDay = escapeRegex(day);
+        if (schedule) {
+            const escapedSchedule = escapeRegex(schedule);
             queryConditions.push({
                 $or: [
-                    { day: { $regex: escapedDay, $options: 'i' } },
+                    { schedule: { $regex: escapedSchedule, $options: 'i' } },
                 ],
             });
         }
@@ -359,9 +360,8 @@ exports.createSchedule = async (req, res) => {
             _id: scheduleId,
             course: req.body.course,
             code: req.body.code,
-            day: req.body.day,
-            startTime: req.body.startTime,
-            endTime: req.body.endTime,
+            section: req.body.section,
+            schedule: req.body.schedule,
 
         })
 
