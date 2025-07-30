@@ -2,8 +2,10 @@
 const mongoose = require('mongoose');
 
 const Course = require('../models/course');
+const Schedule = require('../models/schedule');
 const Program = require('../models/program');
 const Semester = require('../models/semester');
+
 
 const performUpdate = (id, updateFields, res) => {
     Course.findByIdAndUpdate(id, updateFields, { new: true })
@@ -114,6 +116,76 @@ exports.getCourse = async (req, res) => {
             .populate('prerequisite', 'name code');
 
         return res.status(200).json(courses);
+
+    } catch (error) {
+        console.error('Error retrieving courses:', error);
+        return res.status(500).json({
+            message: "Error in retrieving courses",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.getSchedule = async (req, res) => {
+    try {
+        const { isArchived, query, course, day } = req.query;
+
+        const escapeRegex = (value) => {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        let searchCriteria = {};
+        const queryConditions = [];
+
+        if (query) {
+            const escapedQuery = escapeRegex(query);
+            const orConditions = [];
+
+            if (mongoose.Types.ObjectId.isValid(query)) {
+                orConditions.push({ _id: query });
+            }
+            orConditions.push(
+                { name: { $regex: escapedQuery, $options: 'i' } },
+                { section: { $regex: escapedQuery, $options: 'i' } },
+                { description: { $regex: escapedQuery, $options: 'i' } },
+            );
+
+            queryConditions.push({ $or: orConditions });
+        }
+
+
+
+        if (course) {
+            const escapedCourse = escapeRegex(course);
+            queryConditions.push({
+                $or: [
+                    { course: { $regex: escapedCourse, $options: 'i' } },
+                ],
+            });
+        }
+
+
+        if (day) {
+            const escapedDay = escapeRegex(day);
+            queryConditions.push({
+                $or: [
+                    { day: { $regex: escapedDay, $options: 'i' } },
+                ],
+            });
+        }
+
+        if (isArchived) {
+            const isArchivedBool = isArchived === 'true'; // Convert to boolean
+            queryConditions.push({ isArchived: isArchivedBool });
+        }
+
+        if (queryConditions.length > 0) {
+            searchCriteria = { $and: queryConditions };
+        }
+        const schedules = await Schedule.find(searchCriteria)
+            .populate('course', 'name code unit');
+
+        return res.status(200).json(schedules);
 
     } catch (error) {
         console.error('Error retrieving courses:', error);
@@ -266,6 +338,37 @@ exports.createCourse = async (req, res) => {
         return res.status(201).json({
             message: "Course created successfully",
             course: saveCourse
+        });
+
+    }
+    catch (error) {
+        console.error('Error creating course:', error);
+        return res.status(500).json({
+            message: "Error in creating course",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.createSchedule = async (req, res) => {
+    try {
+        const scheduleId = new mongoose.Types.ObjectId();
+        console.log(req.body);
+
+        const schedule = new Schedule({
+            _id: scheduleId,
+            course: req.body.course,
+            code: req.body.code,
+            day: req.body.day,
+            startTime: req.body.startTime,
+            endTime: req.body.endTime,
+
+        })
+
+        const saveSchedule = await schedule.save();
+        return res.status(201).json({
+            message: "Schedule created successfully",
+            schedule: saveSchedule
         });
 
     }

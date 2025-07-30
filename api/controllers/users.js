@@ -293,6 +293,7 @@ exports.getUser = async (req, res) => {
                     select: 'name code unit semester'
                 }
             })
+            .populate('schedule', 'code course day startTime endTime')
             .sort({ createdAt: -1 });
 
         return res.status(200).json(users);
@@ -478,7 +479,7 @@ exports.loginUser = async (req, res, next) => {
                             });
                         }
                         if (result) {
-                            console.log("here")
+
                             const token = jwt.sign({
                                 userId: user[0]._id,
                                 username: user[0].username,

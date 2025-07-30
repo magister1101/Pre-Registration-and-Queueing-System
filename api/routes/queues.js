@@ -14,6 +14,8 @@ router.get('/resetQueues', checkAuth, queueController.resetQueues)
 
 router.post('/createQueue', queueController.createQueue);
 
+router.post('/rejectEnrollment', queueController.rejectEnrollment);
+
 router.post('/createTransaction', queueController.createTransaction);
 
 router.post('/checkPrerequisites', queueController.checkPrerequisites);

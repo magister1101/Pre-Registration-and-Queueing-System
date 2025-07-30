@@ -24,6 +24,8 @@ const userSchema = mongoose.Schema({
     year: { type: String }, //year of study
     section: { type: String }, //section of the program
 
+    schedule: [{ type: String, ref: 'Schedule' }],
+
     //for instructor
     window: { type: Number, default: 0 },
     successfulQueue: { type: Number, default: 0 },

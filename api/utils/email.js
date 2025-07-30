@@ -63,6 +63,31 @@ const customEmailtemplate = (studentName, date, message) => {
         `;
 }
 
+const queueEmailTemplate = (studentName, queueNumber) => {
+    return `
+    <h2>Dear ${studentName},</h2>
+    <p>Your pre-registration has been verified</p>
+    <p>Please note that your queue Number is ${queueNumber}.</p>
+    <br>
+    <p>Best regards,</p
+    <p>Cavite State University - Tanza Campus</p>
+
+    `;
+}
+
+
+const queueEmailRejectTemplate = (studentName) => {
+    return `
+    <h2>Dear ${studentName},</h2>
+    <p>Your pre-registration has been rejected</p>
+    <p>Please fill out the pre-registration again and ensure that you have taken all the required courses.</p>
+    <br>
+    <p>Best regards,</p
+    <p>Cavite State University - Tanza Campus</p>
+
+    `;
+}
+
 
 
 const generateEmailTemplateInvalidCredentials = (studentName) => {
@@ -83,5 +108,7 @@ module.exports = {
     transporter,
     generateEmailTemplate,
     generateEmailTemplateInvalidCredentials,
-    customEmailtemplate
+    customEmailtemplate,
+    queueEmailTemplate,
+    queueEmailRejectTemplate
 };

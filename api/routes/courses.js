@@ -8,6 +8,8 @@ const CoursesController = require('../controllers/courses')
 
 router.get('/', CoursesController.getCourse);
 
+router.get('/getSchedule', CoursesController.getSchedule);
+
 router.get('/getProgram', CoursesController.getProgram);
 
 router.get('/getPrerequisite', CoursesController.getPrerequisite);
@@ -15,6 +17,8 @@ router.get('/getPrerequisite', CoursesController.getPrerequisite);
 router.get('/getSemester', CoursesController.getSemester)
 
 router.post('/createCourse', CoursesController.createCourse);
+
+router.post('/createSchedule', CoursesController.createSchedule);
 
 router.post('/createProgram', CoursesController.createProgram);
 

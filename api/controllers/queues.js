@@ -4,7 +4,9 @@ const Queue = require('../models/queue');
 const User = require('../models/user');
 const Course = require('../models/course');
 const Counter = require('../models/counter');
-const { broadcastUpdate } = require('../../websocket'); // Import from websocket.js
+const { broadcastUpdate } = require('../../websocket');
+
+const { transporter, queueEmailTemplate, queueEmailRejectTemplate } = require('../utils/email');
 
 
 const destinations = ['registrar', 'admission', 'cashier'];
@@ -218,14 +220,39 @@ exports.createQueue = async (req, res) => {
             return res.status(404).json({ message: 'Student not found' });
         }
 
+        const studentName = `${student.firstName} ${student.middleName ? student.middleName + " " : ""}${student.lastName}`;
+        const recipientEmail = student.email;
+
+
+
+
+
         // Find and increment the counter
-        await Counter.findOneAndUpdate(
+        const counter = await Counter.findOneAndUpdate(
             { name: 'queueNumber' },
             { $inc: { value: 1 } },
             { new: true, upsert: true }
         );
 
-        const queueNumber = `Q-${student.studentNumber}`;
+        const queueNumber = `${counter.value} - ${student.studentNumber}`;
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            replyTo: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: "Account Verification",
+            text: queueEmailTemplate(studentName, queueNumber),
+            html: queueEmailTemplate(studentName, queueNumber),
+        };
+
+        transporter.sendMail(mailOptions, (err, info) => {
+            if (err) {
+                console.error("Email Error:", err);
+                return res.status(500).json({ message: "Failed to send email." });
+            }
+            console.log("Email sent:", info.response);
+            res.status(200).json({ message: "Email sent successfully!" });
+        });
 
         // Count waiting queues
         const waitingQueues = await Queue.countDocuments({ status: 'Waiting' });
@@ -252,6 +279,44 @@ exports.createQueue = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+exports.rejectEnrollment = async (req, res) => {
+
+    const studentId = req.body.studentId;
+
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+        return res.status(400).json({ message: 'Invalid student ID' });
+    }
+
+    const student = await User.findById(studentId);
+    if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+    }
+
+    const studentName = `${student.firstName} ${student.middleName ? student.middleName + " " : ""}${student.lastName}`;
+    const recipientEmail = student.email;
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        replyTo: process.env.EMAIL_USER,
+        to: recipientEmail,
+        subject: "Account Verification",
+        text: queueEmailRejectTemplate(studentName),
+        html: queueEmailRejectTemplate(studentName),
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+            console.error("Email Error:", err);
+            return res.status(500).json({ message: "Failed to send email." });
+        }
+        console.log("Email sent:", info.response);
+        res.status(200).json({ message: "Email sent successfully!" });
+    });
+
+    return res.status(200).json({ message: 'Rejected successfully' });
+
+}
 
 
 exports.createTransaction = async (req, res) => {
@@ -419,8 +484,6 @@ exports.resetQueues = async (req, res) => {
 
 exports.updateQueue = async (req, res) => {
     try {
-        console.log("here", req.body)
-
         const queueId = await req.params.id;
         const updateFields = await req.body;
 
