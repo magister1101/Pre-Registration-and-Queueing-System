@@ -129,7 +129,7 @@ exports.getCourse = async (req, res) => {
 
 exports.getSchedule = async (req, res) => {
     try {
-        const { isArchived, query, course, schedule } = req.query;
+        const { isArchived, query, course, schedule, program } = req.query;
 
         const escapeRegex = (value) => {
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -165,6 +165,29 @@ exports.getSchedule = async (req, res) => {
             });
         }
 
+        if (program) {
+            const escapedProgram = escapeRegex(program);
+
+            // Find all matching courses first
+            const matchedPrograms = await Course.find({
+                $or: [
+                    { name: { $regex: escapedProgram, $options: 'i' } },
+                    { code: { $regex: escapedProgram, $options: 'i' } },
+                    { course: { $regex: escapedProgram, $options: 'i' } } // program name
+                ]
+            }).select('_id');
+
+            const courseIds = matchedPrograms.map(c => c._id);
+
+            // If no matching courses, force no results
+            if (courseIds.length > 0) {
+                queryConditions.push({ course: { $in: courseIds } });
+            } else {
+                queryConditions.push({ course: { $in: [] } });
+            }
+        }
+
+
 
         if (schedule) {
             const escapedSchedule = escapeRegex(schedule);
@@ -184,7 +207,7 @@ exports.getSchedule = async (req, res) => {
             searchCriteria = { $and: queryConditions };
         }
         const schedules = await Schedule.find(searchCriteria)
-            .populate('course', 'name code unit');
+            .populate('course', 'name code unit course');
 
         return res.status(200).json(schedules);
 

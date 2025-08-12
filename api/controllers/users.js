@@ -401,7 +401,13 @@ exports.deleteUser = async (req, res) => {
 exports.myProfile = async (req, res) => {
     try {
         const user = await User.findOne({ _id: req.userData.userId })
-            .populate('courseToTake', 'name code unit course description');
+            .populate('courseToTake', 'name code unit course description')
+            .populate({
+                path: 'schedule',
+                populate: {
+                    path: 'course', // get the course details inside the schedule
+                }
+            })
 
         return res.status(200).json(user);
     } catch (error) {
@@ -581,6 +587,38 @@ exports.updateUser = async (req, res, next) => {
         });
     }
 };
+
+exports.addSchedule = async (req, res, next) => {
+    try {
+        const { userId, scheduleId } = req.body;
+        console.log(req.body)
+
+        if (!userId || !scheduleId) {
+            return res.status(400).json({ message: 'userId and scheduleId are required' });
+        }
+
+        // Validate ObjectId
+        if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(scheduleId)) {
+            return res.status(400).json({ message: 'Invalid userId or scheduleId' });
+        }
+
+        // Push schedule ID if not already added
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $addToSet: { schedule: scheduleId } }, // $addToSet prevents duplicates
+            { new: true }
+        ).populate('schedule'); // optional: to return populated schedules
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'Schedule added successfully', user: updatedUser });
+    } catch (err) {
+        console.error('Error adding schedule:', err);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}
 
 exports.enrollRegular = async (req, res) => {
     try {

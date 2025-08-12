@@ -26,6 +26,8 @@ router.post('/create', UsersController.createUser);
 
 router.post('/update/:userId', UsersController.updateUser);
 
+router.post('/addSchedule', UsersController.addSchedule);
+
 router.post('/login', UsersController.loginUser);
 
 router.post('/sendEmail/:id', UsersController.sendEmail);
