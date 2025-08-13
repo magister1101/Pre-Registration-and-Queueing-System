@@ -26,6 +26,8 @@ router.post('/create', UsersController.createUser);
 
 router.post('/update/:userId', UsersController.updateUser);
 
+router.post('/enroll/:id', UsersController.enrollSchedule);
+
 router.post('/addSchedule', UsersController.addSchedule);
 
 router.post('/login', UsersController.loginUser);
@@ -45,6 +47,8 @@ router.post('/clockIn', UsersController.clockIn);
 router.post('/clockOut', UsersController.clockOut);
 
 router.delete('/delete', UsersController.deleteUser);
+
+router.get('/test', UsersController.test)
 
 
 

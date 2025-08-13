@@ -9,6 +9,7 @@ const User = require('../models/user');
 const Course = require('../models/course');
 const Semester = require('../models/semester');
 const TransactionLog = require('../models/transactionLog');
+const Schedule = require('../models/schedule')
 
 
 exports.sendEmail = async (req, res) => {
@@ -1443,6 +1444,80 @@ exports.getTransactionLogs = async (req, res) => {
         });
     }
 };
+
+exports.enrollSchedule = async (req, res) => {
+    try {
+        const { id } = req.params; // student ID
+        const { courseToTake, section } = req.body; // section comes from request body
+
+        // Find the user
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Step 1: Store only course IDs in courseToTake
+        const courseIds = courseToTake.map(c => c._id.toString());
+        user.courseToTake = courseIds;
+
+        // Step 2: Find schedules for these courses in the given section
+        const schedules = await Schedule.find({
+            course: { $in: courseIds },
+            section: section
+        });
+
+        console.log(schedules);
+        // Step 3: Attach schedule IDs to the user
+        const scheduleIds = schedules.map(s => s._id.toString());
+        user.schedule = scheduleIds;
+
+        // Step 4: Mark the student as enrolled
+        user.isEnrolled = true;
+
+        await user.save();
+
+        res.json({
+            message: 'Enrollment successful.',
+            courseToTake: courseIds,
+            schedule: scheduleIds
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error enrolling student.', error });
+    }
+};
+
+
+exports.test = async (req, res) => {
+    try {
+        const id = "6874c3f6b398bae6aaae14d1";
+
+        // Get the user (program is stored directly in user.course)
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Populate the subject in each schedule
+        const schedules = await Schedule.find()
+            .populate("course"); // course here = subject
+
+        // Filter schedules whose subject's course matches the user's program
+        const filteredSchedules = schedules.filter(sch =>
+            sch.course && sch.course.course === user.course
+        );
+
+        res.status(200).json(filteredSchedules);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+
+
+
+
 
 
 

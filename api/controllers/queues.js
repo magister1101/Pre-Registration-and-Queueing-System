@@ -281,42 +281,73 @@ exports.createQueue = async (req, res) => {
 };
 
 exports.rejectEnrollment = async (req, res) => {
+    try {
+        const studentId = req.body.studentId;
 
-    const studentId = req.body.studentId;
-
-    if (!mongoose.Types.ObjectId.isValid(studentId)) {
-        return res.status(400).json({ message: 'Invalid student ID' });
-    }
-
-    const student = await User.findById(studentId);
-    if (!student) {
-        return res.status(404).json({ message: 'Student not found' });
-    }
-
-    const studentName = `${student.firstName} ${student.middleName ? student.middleName + " " : ""}${student.lastName}`;
-    const recipientEmail = student.email;
-
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        replyTo: process.env.EMAIL_USER,
-        to: recipientEmail,
-        subject: "Account Verification",
-        text: queueEmailRejectTemplate(studentName),
-        html: queueEmailRejectTemplate(studentName),
-    };
-
-    transporter.sendMail(mailOptions, (err, info) => {
-        if (err) {
-            console.error("Email Error:", err);
-            return res.status(500).json({ message: "Failed to send email." });
+        if (!mongoose.Types.ObjectId.isValid(studentId)) {
+            return res.status(400).json({ message: 'Invalid student ID' });
         }
-        console.log("Email sent:", info.response);
-        res.status(200).json({ message: "Email sent successfully!" });
-    });
 
-    return res.status(200).json({ message: 'Rejected successfully' });
+        // Find student and populate schedule with course details
+        const student = await User.findById(studentId)
+            .populate({
+                path: "schedule",
+                populate: {
+                    path: "course", // subject in Schedule
+                    select: "name code course year semester"
+                }
+            });
 
-}
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        const studentName = `${student.firstName} ${student.middleName ? student.middleName + " " : ""}${student.lastName}`;
+        const recipientEmail = student.email;
+
+        // Build schedule list as HTML
+        const scheduleList = student.schedule.map(sch => {
+            return `<li>
+          <strong>${sch.course?.name || 'Unknown Course'}</strong> (${sch.course?.code || 'No Code'})  
+          - ${sch.section} | ${sch.course?.course || 'Unknown Program'}  
+          Year ${sch.course?.year || '?'} - ${sch.course?.semester || '?'} Semester
+        </li>`;
+        }).join("");
+
+        // Add the schedule list to your email template
+        const emailHtml = `
+        <p>Dear ${studentName},</p>
+        <p>We regret to inform you that your enrollment has been rejected.</p>
+        <p>Below are the recommended schedules to take:</p>
+        <ul>
+          ${scheduleList || "<li>No schedules found.</li>"}
+        </ul>
+        <p>If you believe this is an error, please contact the registrar.</p>
+      `;
+
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            replyTo: process.env.EMAIL_USER,
+            to: recipientEmail,
+            subject: "Enrollment Rejection Notice",
+            html: emailHtml
+        };
+
+        transporter.sendMail(mailOptions, (err, info) => {
+            if (err) {
+                console.error("Email Error:", err);
+                return res.status(500).json({ message: "Failed to send email." });
+            }
+            console.log("Email sent:", info.response);
+            return res.status(200).json({ message: "Rejection email sent successfully!" });
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error rejecting enrollment", error });
+    }
+};
+
 
 
 exports.createTransaction = async (req, res) => {
