@@ -5,6 +5,7 @@ const Course = require('../models/course');
 const Schedule = require('../models/schedule');
 const Program = require('../models/program');
 const Semester = require('../models/semester');
+const SchedCounter = require('../models/schedCounter')
 const schedule = require('../models/schedule');
 
 
@@ -377,16 +378,53 @@ exports.createCourse = async (req, res) => {
 exports.createSchedule = async (req, res) => {
     try {
         const scheduleId = new mongoose.Types.ObjectId();
-        console.log(req.body);
 
+        // Get current year
+        const currentYear = new Date().getFullYear();
+
+        // Get current semester from DB (assuming only one active semester document)
+        const semesterDoc = await Semester.findOne();
+        if (!semesterDoc) {
+            return res.status(400).json({ message: "No semester found" });
+        }
+
+        // Normalize semester name
+        const semesterName = semesterDoc.semester.trim().toLowerCase();
+
+        const semesterMap = {
+            first: "0",
+            second: "1",
+            summer: "2",
+        };
+
+        const semCode = semesterMap[semesterName];
+        if (semCode === undefined) {
+            return res.status(400).json({ message: `Invalid semester value: ${semesterDoc.semester}` });
+        }
+
+
+        // Increment schedule counter
+        let counter = await SchedCounter.findOne();
+        if (!counter) {
+            counter = new SchedCounter({ value: 0 });
+        }
+        counter.value += 1;
+        await counter.save();
+
+        // Pad counter to 5 digits
+        const counterPadded = String(counter.value).padStart(5, '0');
+
+        // Final generated code
+        const generatedCode = `${currentYear}${semCode}${counterPadded}`;
+
+        // Create schedule
         const schedule = new Schedule({
             _id: scheduleId,
             course: req.body.course,
-            code: req.body.code,
+            code: generatedCode,
             section: req.body.section,
             schedule: req.body.schedule,
-
-        })
+        });
 
         const saveSchedule = await schedule.save();
         return res.status(201).json({
@@ -394,15 +432,16 @@ exports.createSchedule = async (req, res) => {
             schedule: saveSchedule
         });
 
-    }
-    catch (error) {
-        console.error('Error creating course:', error);
+    } catch (error) {
+        console.error('Error creating schedule:', error);
         return res.status(500).json({
-            message: "Error in creating course",
+            message: "Error in creating schedule",
             error: error.message || error,
         });
     }
 };
+
+
 
 exports.createProgram = async (req, res) => {
     try {
