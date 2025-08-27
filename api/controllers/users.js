@@ -294,6 +294,14 @@ exports.getUser = async (req, res) => {
                     select: 'name code unit semester'
                 }
             })
+            .populate({
+                path: 'courseToTakeRemoved',
+                select: 'name code unit course semester description prerequisite',
+                populate: {
+                    path: 'prerequisite',
+                    select: 'name code unit semester'
+                }
+            })
             .populate('schedule', 'code section course day schedule')
             .populate({
                 path: 'schedule',
@@ -403,6 +411,7 @@ exports.myProfile = async (req, res) => {
     try {
         const user = await User.findOne({ _id: req.userData.userId })
             .populate('courseToTake', 'name code unit course description')
+            .populate('courseToTakeRemoved', 'name code unit course description')
             .populate({
                 path: 'schedule',
                 populate: {
@@ -588,6 +597,73 @@ exports.updateUser = async (req, res, next) => {
         });
     }
 };
+
+exports.removeCourseToTake = async (req, res, next) => {
+    try {
+        const { userId, courseId } = req.body;
+
+        if (!userId || !courseId) {
+            return res.status(400).json({ message: "userId and courseId are required" });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if course exists in courseToTake
+        const courseIndex = user.courseToTake.indexOf(courseId);
+        if (courseIndex === -1) {
+            return res.status(400).json({ message: "Course not found in courseToTake" });
+        }
+
+        // Remove from courseToTake
+        user.courseToTake.splice(courseIndex, 1);
+
+        // Push to courseToTakeRemoved (if not already there)
+        if (!user.courseToTakeRemoved.includes(courseId)) {
+            user.courseToTakeRemoved.push(courseId);
+        }
+
+        await user.save();
+
+        return res.status(200).json({ message: "Course removed successfully", user });
+    } catch (err) {
+        console.error("Error removing courseToTake:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+exports.addCourseToTake = async (req, res, next) => {
+    try {
+        const { userId, courseId } = req.body;
+
+        if (!userId || !courseId) {
+            return res.status(400).json({ message: "userId and courseId are required" });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.courseToTake.includes(courseId)) {
+            return res.status(400).json({ message: "Course already exists in courseToTake" });
+        }
+
+        user.courseToTake.push(courseId);
+
+        // If the course was previously removed, take it out from courseToTakeRemoved
+        user.courseToTakeRemoved = user.courseToTakeRemoved.filter(c => c.toString() !== courseId);
+
+        await user.save();
+
+        return res.status(200).json({ message: "Course added successfully", user });
+    } catch (err) {
+        console.error("Error adding courseToTake:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
 
 exports.addSchedule = async (req, res, next) => {
     try {
@@ -1315,6 +1391,101 @@ exports.insertStudents = async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 };
+
+exports.insertGradesByRow = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        // Force the correct headers (studentNumber | courseCode | grade)
+        const rows = xlsx.utils.sheet_to_json(sheet, {
+            header: ["studentNumber", "courseCode", "grade"],
+            range: 1, // skip first row (header row)
+        });
+
+        for (const row of rows) {
+            const { studentNumber, courseCode, grade: rawGrade } = row;
+
+            if (!studentNumber || !courseCode || rawGrade === undefined) {
+                console.log("Skipping row due to missing required fields:", row);
+                continue;
+            }
+
+            const grade = parseFloat(rawGrade);
+            if (isNaN(grade)) {
+                console.log(`Invalid grade for ${studentNumber} in ${courseCode}: ${rawGrade}`);
+                continue;
+            }
+
+            // Check course existence
+            const courseData = await Course.findOne({ code: courseCode.trim(), isArchived: false });
+            if (!courseData) {
+                console.log(`Course not found in DB: ${courseCode}`);
+                continue;
+            }
+
+            // Find student (create if not found)
+            let student = await User.findOne({ studentNumber });
+            if (!student) {
+                const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
+                student = new User({
+                    _id: new mongoose.Types.ObjectId(),
+                    username: studentNumber,
+                    password: hashedPassword,
+                    email: `${studentNumber}@example.com`, // fallback email
+                    firstName: "Unknown",
+                    lastName: "Student",
+                    role: "student",
+                    studentNumber,
+                    isArchived: false,
+                    isRegular: true,
+                    courses: [],
+                    courseToTake: [],
+                    isEmailSent: false,
+                });
+            }
+
+            // Merge course into existing courses
+            let finalCourses = student.courses || [];
+            const existingIndex = finalCourses.findIndex(
+                (c) => String(c.courseId) === String(courseData._id)
+            );
+
+            if (existingIndex > -1) {
+                finalCourses[existingIndex].grade = grade; // update grade
+            } else {
+                finalCourses.push({ courseId: courseData._id, grade });
+            }
+
+            // Check if still regular (grade must be between 1–3)
+            const hasInvalidGrade = finalCourses.some(c => c.grade === 0 || c.grade > 3);
+
+            const update = {
+                courses: finalCourses,
+                isRegular: !hasInvalidGrade,
+            };
+
+            // Update student document
+            await User.findOneAndUpdate(
+                { studentNumber },
+                { $set: update },
+                { upsert: true, new: true, setDefaultsOnInsert: true }
+            );
+        }
+
+        res.json({ message: "Grades imported and processed successfully." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+
+
 
 exports.clockIn = async (req, res) => {
     const { userId } = req.body;

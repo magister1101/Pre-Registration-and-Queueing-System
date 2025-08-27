@@ -26,6 +26,10 @@ router.post('/create', UsersController.createUser);
 
 router.post('/update/:userId', UsersController.updateUser);
 
+router.post('/removeCourseToTake', UsersController.removeCourseToTake);
+
+router.post('/addCourseToTake', UsersController.addCourseToTake);
+
 router.post('/enroll/:id', UsersController.enrollSchedule);
 
 router.post('/addSchedule', UsersController.addSchedule);
@@ -41,6 +45,8 @@ router.post('/enrollRegular/:id', UsersController.enrollRegular)
 router.post('/rejectEmail/:id', UsersController.sendEmailReject);
 
 router.post('/excel/insertStudents', upload.single('file'), UsersController.insertStudents);
+
+router.post('/excel/insertGrades', upload.single('file'), UsersController.insertGradesByRow);
 
 router.post('/clockIn', UsersController.clockIn);
 

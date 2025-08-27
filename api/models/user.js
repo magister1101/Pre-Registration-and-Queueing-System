@@ -16,6 +16,7 @@ const userSchema = mongoose.Schema({
 
     courses: [{ courseId: { type: String, ref: 'Course' }, grade: { type: Number } }], //if student this is the courses taken
     courseToTake: [{ type: String, ref: 'Course' }], //if student this is the courses to take
+    courseToTakeRemoved: [{ type: String, ref: 'Course' }],
 
     studentNumber: { type: String, unique: true },
 

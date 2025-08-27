@@ -285,43 +285,59 @@ exports.rejectEnrollment = async (req, res) => {
         const studentId = req.body.studentId;
 
         if (!mongoose.Types.ObjectId.isValid(studentId)) {
-            return res.status(400).json({ message: 'Invalid student ID' });
+            return res.status(400).json({ message: "Invalid student ID" });
         }
 
-        // Find student and populate schedule with course details
+        // Find student and populate courseToTake & courseToTakeRemoved
         const student = await User.findById(studentId)
-            .populate({
-                path: "schedule",
-                populate: {
-                    path: "course", // subject in Schedule
-                    select: "name code course year semester"
-                }
-            });
+            .populate("courseToTake", "name code course unit year semester")
+            .populate("courseToTakeRemoved", "name code course unit year semester");
 
         if (!student) {
-            return res.status(404).json({ message: 'Student not found' });
+            return res.status(404).json({ message: "Student not found" });
         }
 
-        const studentName = `${student.firstName} ${student.middleName ? student.middleName + " " : ""}${student.lastName}`;
+        const studentName = `${student.firstName} ${student.middleName ? student.middleName + " " : ""
+            }${student.lastName}`;
         const recipientEmail = student.email;
 
-        // Build schedule list as HTML
-        const scheduleList = student.schedule.map(sch => {
-            return `<li>
-          <strong>${sch.course?.name || 'Unknown Course'}</strong> (${sch.course?.code || 'No Code'})  
-          - ${sch.section} | ${sch.course?.course || 'Unknown Program'}  
-          Year ${sch.course?.year || '?'} - ${sch.course?.semester || '?'} Semester
-        </li>`;
-        }).join("");
+        // Build courseToTake list
+        const toTakeList = student.courseToTake
+            .map(
+                (c) => `
+        <li>
+          <strong>${c.name}</strong> (${c.code}) - ${c.course || "Unknown Program"}  
+          Year ${c.year || "?"}, ${c.semester || "?"} Semester | ${c.unit || 0} unit(s)
+        </li>`
+            )
+            .join("");
 
-        // Add the schedule list to your email template
+        // Build courseToTakeRemoved list
+        const removedList = student.courseToTakeRemoved
+            .map(
+                (c) => `
+        <li style="color:red;">
+          <strong>${c.name}</strong> (${c.code}) - ${c.course || "Unknown Program"}  
+          Year ${c.year || "?"}, ${c.semester || "?"} Semester | ${c.unit || 0} unit(s)
+        </li>`
+            )
+            .join("");
+
+        // Email HTML
         const emailHtml = `
         <p>Dear ${studentName},</p>
         <p>We regret to inform you that your enrollment has been rejected.</p>
-        <p>Below are the recommended schedules to take:</p>
+        
+        <p><strong>Recommended Courses to Take:</strong></p>
         <ul>
-          ${scheduleList || "<li>No schedules found.</li>"}
+          ${toTakeList || "<li>No courses available.</li>"}
         </ul>
+  
+        <p><strong style="color:red;">Removed Courses:</strong></p>
+        <ul>
+          ${removedList || "<li>No removed courses.</li>"}
+        </ul>
+  
         <p>If you believe this is an error, please contact the registrar.</p>
       `;
 
@@ -330,7 +346,7 @@ exports.rejectEnrollment = async (req, res) => {
             replyTo: process.env.EMAIL_USER,
             to: recipientEmail,
             subject: "Enrollment Rejection Notice",
-            html: emailHtml
+            html: emailHtml,
         };
 
         transporter.sendMail(mailOptions, (err, info) => {
@@ -339,14 +355,16 @@ exports.rejectEnrollment = async (req, res) => {
                 return res.status(500).json({ message: "Failed to send email." });
             }
             console.log("Email sent:", info.response);
-            return res.status(200).json({ message: "Rejection email sent successfully!" });
+            return res
+                .status(200)
+                .json({ message: "Rejection email sent successfully!" });
         });
-
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Error rejecting enrollment", error });
     }
 };
+
 
 
 
