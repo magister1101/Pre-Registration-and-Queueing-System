@@ -7,6 +7,7 @@ const Program = require('../models/program');
 const Semester = require('../models/semester');
 const SchedCounter = require('../models/schedCounter')
 const schedule = require('../models/schedule');
+const xlsx = require('xlsx');
 
 
 const performUpdate = (id, updateFields, res) => {
@@ -441,8 +442,6 @@ exports.createSchedule = async (req, res) => {
     }
 };
 
-
-
 exports.createProgram = async (req, res) => {
     try {
         const programId = new mongoose.Types.ObjectId();
@@ -578,5 +577,128 @@ exports.changeSemester = async (req, res) => {
     }
 };
 
+exports.updateSchedule = async (req, res) => {
+    try {
+        const scheduleId = req.params.scheduleId;
+        const updateFields = req.body;
+
+        const updatedSchedule = await Schedule.findByIdAndUpdate(
+            scheduleId,
+            updateFields,
+            { new: true }
+        ).populate('course', 'name code');
+
+        if (!updatedSchedule) {
+            return res.status(404).json({ message: "Schedule not found" });
+        }
+
+        return res.status(200).json({
+            message: "Schedule updated successfully",
+            schedule: updatedSchedule,
+        });
+    } catch (error) {
+        console.error('Error updating schedule:', error);
+        return res.status(500).json({
+            message: "Error in updating schedule",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.deleteSchedule = async (req, res) => {
+    try {
+        const scheduleId = req.params.scheduleId;
+
+        const deletedSchedule = await Schedule.findByIdAndDelete(scheduleId);
+
+        if (!deletedSchedule) {
+            return res.status(404).json({ message: "Schedule not found" });
+        }
+
+        return res.status(200).json({
+            message: "Schedule deleted successfully",
+            schedule: deletedSchedule,
+        });
+    } catch (error) {
+        console.error('Error deleting schedule:', error);
+        return res.status(500).json({
+            message: "Error in deleting schedule",
+            error: error.message || error,
+        });
+    }
+};
+
+exports.insertSchedules = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        // Read uploaded Excel
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = xlsx.utils.sheet_to_json(sheet);
+
+        // Validate structure
+        if (
+            !rows[0] ||
+            !("code" in rows[0]) ||
+            !("course" in rows[0]) ||
+            !("section" in rows[0]) ||
+            !("room" in rows[0]) ||
+            !("day" in rows[0]) ||
+            !("startTime" in rows[0]) ||
+            !("endTime" in rows[0])
+        ) {
+            return res.status(400).json({
+                error:
+                    "Invalid Excel format. Columns must be: code, course, section, room, day, startTime, endTime",
+            });
+        }
+
+        // Group schedules by code + section
+        const groupedSchedules = {};
+
+        for (const row of rows) {
+            const { code, course, section, room, day, startTime, endTime } = row;
+
+            if (!code || !course || !section) continue;
+
+            // 🔍 Find the course by its code
+            const courseDoc = await Course.findOne({ code: course });
+            if (!courseDoc) {
+                console.log(`Skipping row: Course ${course} not found`);
+                continue;
+            }
+
+            const key = `${code}-${section}`;
+            if (!groupedSchedules[key]) {
+                groupedSchedules[key] = {
+                    _id: new mongoose.Types.ObjectId(),
+                    code,
+                    course: courseDoc._id, // ✅ store course as ObjectId
+                    section,
+                    schedule: [],
+                };
+            }
+
+            groupedSchedules[key].schedule.push({
+                room,
+                day,
+                startTime,
+                endTime,
+            });
+        }
+
+        // Save to DB
+        const schedules = Object.values(groupedSchedules);
+        await Schedule.insertMany(schedules);
+
+        res.json({ message: "Schedules imported successfully", count: schedules.length });
+    } catch (error) {
+        console.error("Error importing schedules:", error);
+        res.status(500).json({ error: "Error importing schedules" });
+    }
+};
 
 

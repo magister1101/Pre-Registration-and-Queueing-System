@@ -6,6 +6,7 @@ const scheduleSchema = mongoose.Schema({
     course: { type: String, required: true, ref: 'Course' },
     section: { type: String, required: true },
     schedule: [{
+        room: { type: String, required: true },
         day: { type: String, required: true },
         startTime: { type: String, required: true },
         endTime: { type: String, required: true },

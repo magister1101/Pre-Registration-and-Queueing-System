@@ -1484,9 +1484,6 @@ exports.insertGradesByRow = async (req, res) => {
     }
 };
 
-
-
-
 exports.clockIn = async (req, res) => {
     const { userId } = req.body;
 
