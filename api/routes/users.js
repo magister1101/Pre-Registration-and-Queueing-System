@@ -38,6 +38,8 @@ router.post('/login', UsersController.loginUser);
 
 router.post('/sendEmail/:id', UsersController.sendEmail);
 
+router.post('/emailCourseStudents', UsersController.emailCourseStudents);
+
 router.post('/emailStudent', UsersController.emailStudent);
 
 router.post('/enrollRegular/:id', UsersController.enrollRegular)

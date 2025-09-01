@@ -7,9 +7,11 @@ const { transporter, customEmailtemplate, generateEmailTemplate, generateEmailTe
 
 const User = require('../models/user');
 const Course = require('../models/course');
+const Program = require('../models/program');
 const Semester = require('../models/semester');
 const TransactionLog = require('../models/transactionLog');
 const Schedule = require('../models/schedule')
+const nodemailer = require("nodemailer");
 
 
 exports.sendEmail = async (req, res) => {
@@ -72,6 +74,53 @@ exports.sendEmail = async (req, res) => {
         res.status(500).json({ error: "Failed to send email" });
     }
 };
+
+
+exports.emailCourseStudents = async (req, res) => {
+    try {
+        const { courseId, subject, message, date } = req.body;
+
+        if (!courseId || !subject || !message) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        const program = await Program.findById(courseId);
+        if (!program) {
+            return res.status(404).json({ error: "Program not found" });
+        }
+
+        const students = await User.find({ course: program.name });
+        if (!students || students.length === 0) {
+            return res.status(404).json({ error: "No students found in this program" });
+        }
+
+        for (const student of students) {
+            if (!student.email) continue;
+
+            const mailOptions = {
+                from: process.env.EMAIL_USER,
+                replyTo: process.env.EMAIL_USER,
+                to: student.email,
+                subject,
+                text: `Hello ${student.firstName || "Student"},\n\n${message}\n\nDate: ${date}`,
+                html: `<p>Hello <b>${student.firstName || "Student"}</b>,</p>
+                       <p>${message}</p>
+                       <p><b>Date:</b> ${date}</p>`,
+            };
+
+            await transporter.sendMail(mailOptions);
+        }
+
+        res.status(200).json({
+            message: `Emails sent to ${students.length} student(s) in program ${program.name}`,
+        });
+
+    } catch (err) {
+        console.error("❌ Error sending course emails:", err);
+        res.status(500).json({ error: "Failed to send course emails" });
+    }
+};
+
 
 exports.emailStudent = async (req, res) => {
     try {
@@ -1656,32 +1705,28 @@ exports.enrollSchedule = async (req, res) => {
     }
 };
 
-
 exports.test = async (req, res) => {
     try {
-        const id = "6874c3f6b398bae6aaae14d1";
+        console.log("test");
+        const courseId = "67f1c1c21f8c36d49ef32f12";
 
-        // Get the user (program is stored directly in user.course)
-        const user = await User.findById(id);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
+        const course = await Program.findById(courseId);
+        console.log(course.name);
+
+        // Find all students in the given course
+        const students = await User.find({ course: course.name });
+
+        if (!students || students.length === 0) {
+            return res.status(404).json({ message: "No students found for this course" });
         }
 
-        // Populate the subject in each schedule
-        const schedules = await Schedule.find()
-            .populate("course"); // course here = subject
-
-        // Filter schedules whose subject's course matches the user's program
-        const filteredSchedules = schedules.filter(sch =>
-            sch.course && sch.course.course === user.course
-        );
-
-        res.status(200).json(filteredSchedules);
+        res.status(200).json({ count: students.length, students });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Server error" });
     }
 };
+
 
 
 
