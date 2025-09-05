@@ -33,6 +33,7 @@ const userSchema = mongoose.Schema({
     missedQueue: { type: Number, default: 0 },
     transferredQueue: { type: Number, default: 0 },
 
+    status: { type: String },
     isRegular: { type: Boolean },
     isApproved: { type: Boolean, default: false },
     isEnrolled: { type: Boolean, default: false },
