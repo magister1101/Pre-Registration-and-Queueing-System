@@ -50,6 +50,8 @@ router.post('/excel/insertStudents', upload.single('file'), UsersController.inse
 
 router.post('/excel/insertGrades', upload.single('file'), UsersController.insertGradesByRow);
 
+router.post('/excel/test', upload.single('file'), UsersController.insertTest);
+
 router.post('/clockIn', UsersController.clockIn);
 
 router.post('/clockOut', UsersController.clockOut);

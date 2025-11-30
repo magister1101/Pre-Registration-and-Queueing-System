@@ -116,7 +116,7 @@ exports.getCourse = async (req, res) => {
             searchCriteria = { $and: queryConditions };
         }
         const courses = await Course.find(searchCriteria)
-            .populate('prerequisite', 'name code');
+            .populate('prerequisite', 'name code semester');
 
         return res.status(200).json(courses);
 
@@ -699,6 +699,38 @@ exports.insertSchedules = async (req, res) => {
         console.error("Error importing schedules:", error);
         res.status(500).json({ error: "Error importing schedules" });
     }
+};
+
+exports.testFunction = async (req, res) => {
+    
+    try {
+        const number = 2;
+
+        if (number === 1) {
+            return res.status(400).json({
+                message: "Number is equal to 1",
+            });
+        }else{
+            return res.status(200).json({
+                message: "Number is not equal to 1",
+            });
+        }
+
+        return res.status(200).json({
+            message: "ito value",
+            number: number,
+        });
+
+        
+    }
+    catch (error) {
+        console.error('Error in test function:', error);
+        return res.status(500).json({
+            message: "pre di ko talaga alam",
+            error: error.message || error,
+        });
+    }
+
 };
 
 

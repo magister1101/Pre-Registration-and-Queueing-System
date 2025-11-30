@@ -12,6 +12,8 @@ const upload = multer({ storage });
 
 router.get('/', CoursesController.getCourse);
 
+router.get('/testFunction', CoursesController.testFunction);
+
 router.get('/getSchedule', CoursesController.getSchedule);
 
 router.get('/getProgram', CoursesController.getProgram);

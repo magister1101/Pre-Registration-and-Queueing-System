@@ -11,6 +11,7 @@ const Program = require('../models/program');
 const Semester = require('../models/semester');
 const TransactionLog = require('../models/transactionLog');
 const Schedule = require('../models/schedule')
+const TestModel = require('../models/testModel');
 const nodemailer = require("nodemailer");
 
 
@@ -1323,12 +1324,294 @@ exports.insertStudent_W = async (req, res) => {
 exports.insertStudents = async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded.' });
+            return res.status(400).json({ error: "No file uploaded." });
         }
 
         const workbook = xlsx.read(req.file.buffer);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = xlsx.utils.sheet_to_json(sheet);
+
+        const rows = xlsx.utils.sheet_to_json(sheet, {
+            header: [
+                "studentNumber",
+                "email",
+                "firstName",
+                "lastName",
+                "middleName",
+                "program",
+                "year",
+                "section",
+                "houseNumber",
+                "street",
+                "barangay",
+                "city",
+                "province",
+                "sex",
+                "birthDate",
+                "elemenarySchool",
+                "highSchool",
+                "seniorHighSchool",
+                "schoolAddress",
+                "isYouIndigenous",
+                "isDisabled",
+                "isFirstCollegeGraduate",
+                "isArchived",
+                "role"
+            ],
+            range: 1,
+        });
+
+        const updatedUsers = [];
+
+        for (const row of rows) {
+            const {
+                studentNumber,
+                email,
+                firstName,
+                lastName,
+                middleName,
+                program,
+                year,
+                section,
+                houseNumber,
+                street,
+                barangay,
+                city,
+                province,
+                sex,
+                birthDate,
+                elemenarySchool,
+                highSchool,
+                seniorHighSchool,
+                schoolAddress,
+                isYouIndigenous = "false",
+                isDisabled = "false",
+                isFirstCollegeGraduate = "false",
+                isArchived = "false",
+                role = "student"
+            } = row;
+
+            if (!studentNumber || !firstName || !lastName) {
+                console.log("Invalid row (skipped):", row);
+                continue;
+            }
+
+            // FIND EXISTING USER
+            let user = await User.findOne({ studentNumber });
+
+            // CREATE NEW USER + _id
+            if (!user) {
+                console.log(`User not found, creating new: ${studentNumber}`);
+
+                const userId = new mongoose.Types.ObjectId(); // <-- UNIQUE _id HERE
+
+                user = new User({
+                    _id: userId,                 // <-- SET NEW ID
+                    studentNumber,
+                    username: studentNumber,
+                    password: await bcrypt.hash(String(studentNumber), 10),
+                });
+            }
+
+            // UPDATE FIELDS
+            user.email = email;
+            user.firstName = firstName;
+            user.lastName = lastName;
+            user.middleName = middleName;
+            user.course = program;
+            user.year = year;
+            user.section = section;
+            user.role = role;
+
+            user.houseNumber = houseNumber;
+            user.street = street;
+            user.barangay = barangay;
+            user.city = city;
+            user.province = province;
+
+            user.sex = sex;
+            user.birthDate = birthDate ? new Date(birthDate) : null;
+
+            user.elemenarySchool = elemenarySchool;
+            user.highSchool = highSchool;
+            user.seniorHighSchool = seniorHighSchool;
+            user.schoolAddress = schoolAddress;
+
+            user.isYouIndigenous = isYouIndigenous === "true" || isYouIndigenous === true;
+            user.isDisabled = isDisabled === "true" || isDisabled === true;
+            user.isFirstCollegeGraduate =
+                isFirstCollegeGraduate === "true" || isFirstCollegeGraduate === true;
+
+            user.isArchived = isArchived === "true" || isArchived === true;
+
+            const savedUser = await user.save();
+            updatedUsers.push(savedUser);
+        }
+
+        res.status(200).json({
+            message: "Student information saved successfully.",
+            updatedCount: updatedUsers.length,
+            data: updatedUsers
+        });
+
+    } catch (error) {
+        console.error("Insert Student Info Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+exports.insertTest = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        const rows = xlsx.utils.sheet_to_json(sheet, {
+            header: [
+                "studentNumber",
+                "email",
+                "firstName",
+                "lastName",
+                "middleName",
+                "program",
+                "year",
+                "section",
+                "houseNumber",
+                "street",
+                "barangay",
+                "city",
+                "province",
+                "sex",
+                "birthDate",
+                "elemenarySchool",
+                "highSchool",
+                "seniorHighSchool",
+                "schoolAddress",
+                "isYouIndigenous",
+                "isDisabled",
+                "isFirstCollegeGraduate",
+                "isArchived",
+                "role"
+            ],
+            range: 1,
+        });
+
+        const updatedUsers = [];
+
+        for (const row of rows) {
+            const {
+                studentNumber,
+                email,
+                firstName,
+                lastName,
+                middleName,
+                program,
+                year,
+                section,
+                houseNumber,
+                street,
+                barangay,
+                city,
+                province,
+                sex,
+                birthDate,
+                elemenarySchool,
+                highSchool,
+                seniorHighSchool,
+                schoolAddress,
+                isYouIndigenous = "false",
+                isDisabled = "false",
+                isFirstCollegeGraduate = "false",
+                isArchived = "false",
+                role = "student"
+            } = row;
+
+            if (!studentNumber || !firstName || !lastName) {
+                console.log("Invalid row (skipped):", row);
+                continue;
+            }
+
+            // FIND EXISTING USER
+            let user = await User.findOne({ studentNumber });
+
+            // CREATE NEW USER + _id
+            if (!user) {
+                console.log(`User not found, creating new: ${studentNumber}`);
+
+                const userId = new mongoose.Types.ObjectId(); // <-- UNIQUE _id HERE
+
+                user = new User({
+                    _id: userId,                 // <-- SET NEW ID
+                    studentNumber,
+                    username: studentNumber,
+                    password: await bcrypt.hash(String(studentNumber), 10),
+                });
+            }
+
+            // UPDATE FIELDS
+            user.email = email;
+            user.firstName = firstName;
+            user.lastName = lastName;
+            user.middleName = middleName;
+            user.course = program;
+            user.year = year;
+            user.section = section;
+            user.role = role;
+
+            user.houseNumber = houseNumber;
+            user.street = street;
+            user.barangay = barangay;
+            user.city = city;
+            user.province = province;
+
+            user.sex = sex;
+            user.birthDate = birthDate ? new Date(birthDate) : null;
+
+            user.elemenarySchool = elemenarySchool;
+            user.highSchool = highSchool;
+            user.seniorHighSchool = seniorHighSchool;
+            user.schoolAddress = schoolAddress;
+
+            user.isYouIndigenous = isYouIndigenous === "true" || isYouIndigenous === true;
+            user.isDisabled = isDisabled === "true" || isDisabled === true;
+            user.isFirstCollegeGraduate =
+                isFirstCollegeGraduate === "true" || isFirstCollegeGraduate === true;
+
+            user.isArchived = isArchived === "true" || isArchived === true;
+
+            const savedUser = await user.save();
+            updatedUsers.push(savedUser);
+        }
+
+        res.status(200).json({
+            message: "Student information saved successfully.",
+            updatedCount: updatedUsers.length,
+            data: updatedUsers
+        });
+
+    } catch (error) {
+        console.error("Insert Student Info Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+
+exports.insertGradesByRow = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = xlsx.utils.sheet_to_json(sheet, {
+            header: ["studentNumber", "email", "firstName", "lastName", "middleName", "program", "year", "section",],
+            range: 1,
+        });
+
+        const updatedUsers = [];
 
         for (const row of rows) {
             const {
@@ -1344,194 +1627,152 @@ exports.insertStudents = async (req, res) => {
                 role = 'student'
             } = row;
 
-            if (!studentNumber || !firstName || !lastName) {
-                console.log(`Skipping row due to missing required fields:`, row);
-                continue;
-            }
-
-            let hasInvalidGrade = false;
-            const incomingCourses = [];
-
-            // Loop through all possible subject columns
-            for (const key of Object.keys(row)) {
-                if ([
-                    'studentNumber', 'email', 'firstName', 'lastName',
-                    'middleName', 'program', 'year', 'section',
-                    'isRegular', 'isArchived', 'role'
-                ].includes(key)) continue;
-
-                const rawGrade = row[key];
-                const grade = parseFloat(rawGrade);
-
-                if (isNaN(grade)) {
-                    console.log(`Invalid grade for ${studentNumber} in ${key}: ${rawGrade}`);
-                    continue;
-                }
-
-                if (grade === 0 || grade > 3) hasInvalidGrade = true;
-
-                const courseData = await Course.findOne({ code: key.trim(), isArchived: false });
-
-                if (!courseData) {
-                    console.log(`Course not found in DB: ${key}`);
-                    continue;
-                }
-
-                incomingCourses.push({
-                    courseId: courseData._id,
-                    grade
-                });
-            }
-
-            const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
-            const studentName = `${firstName} ${middleName ? middleName + " " : ""}${lastName}`;
-
-            const existingUser = await User.findOne({ studentNumber });
-
-            let finalCourses = incomingCourses;
-
-            if (existingUser && Array.isArray(existingUser.courses)) {
-                const existingMap = new Map();
-
-                // Add all existing courses first
-                for (const existingCourse of existingUser.courses) {
-                    existingMap.set(String(existingCourse.courseId), existingCourse);
-                }
-
-                // Overwrite or add new courses from Excel
-                for (const newCourse of incomingCourses) {
-                    existingMap.set(String(newCourse.courseId), newCourse);
-                }
-
-                finalCourses = Array.from(existingMap.values());
-            }
-
-            console.log(`Final course list for ${studentNumber}:`, finalCourses);
-
-            const update = {
-                username: studentNumber,
-                password: hashedPassword,
-                email,
-                firstName,
-                lastName,
-                middleName,
-                role,
-                studentNumber,
-                course: program,
-                year,
-                section,
-                isRegular: !hasInvalidGrade,
-                isArchived: isArchived === true || isArchived === 'true',
-                courses: finalCourses,
-                courseToTake: [],
-                isEmailSent: false
-            };
-
-            await User.findOneAndUpdate(
-                { studentNumber },
-                { $set: update },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
-        }
-
-        res.json({ message: 'Students imported and processed successfully.' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-};
-
-exports.insertGradesByRow = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded." });
-        }
-
-        const workbook = xlsx.read(req.file.buffer);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-        // Force the correct headers (studentNumber | courseCode | grade)
-        const rows = xlsx.utils.sheet_to_json(sheet, {
-            header: ["studentNumber", "courseCode", "grade"],
-            range: 1, // skip first row (header row)
-        });
-
-        for (const row of rows) {
-            const { studentNumber, courseCode, grade: rawGrade } = row;
-
-            if (!studentNumber || !courseCode || rawGrade === undefined) {
-                console.log("Skipping row due to missing required fields:", row);
+            if (!studentNumber || !courseCode) {
+                console.log("Invalid row (skipped):", row);
                 continue;
             }
 
             const grade = parseFloat(rawGrade);
-            if (isNaN(grade)) {
-                console.log(`Invalid grade for ${studentNumber} in ${courseCode}: ${rawGrade}`);
+
+            // Check if courseCode exists
+            const course = await Course.findOne({ code: courseCode });
+            if (!course) {
+                console.log(`CourseCode NOT found in database: ${courseCode}`);
                 continue;
             }
 
-            // Check course existence
-            const courseData = await Course.findOne({ code: courseCode.trim(), isArchived: false });
-            if (!courseData) {
-                console.log(`Course not found in DB: ${courseCode}`);
+            const courseId = course._id.toString();
+
+            // Find student
+            const user = await User.findOne({ studentNumber });
+            if (!user) {
+                console.log(`User not found: ${studentNumber}`);
                 continue;
             }
 
-            // Find student (create if not found)
-            let student = await User.findOne({ studentNumber });
-            if (!student) {
-                const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
-                student = new User({
-                    _id: new mongoose.Types.ObjectId(),
-                    username: studentNumber,
-                    password: hashedPassword,
-                    email: `${studentNumber}@example.com`, // fallback email
-                    firstName: "Unknown",
-                    lastName: "Student",
-                    role: "student",
-                    studentNumber,
-                    isArchived: false,
-                    isRegular: true,
-                    courses: [],
-                    courseToTake: [],
-                    isEmailSent: false,
+            // Check if course already exists in user's courses
+            const existingCourse = user.courses.find(
+                (c) => c.courseId === courseId
+            );
+
+            if (existingCourse) {
+                // Update grade + sem + year
+                existingCourse.grade = grade;
+                existingCourse.sem = sem;
+                existingCourse.year = year;
+            } else {
+                // Add new course entry with sem/year
+                user.courses.push({
+                    courseId: courseId,
+                    grade,
+                    sem,
+                    year
                 });
             }
 
-            // Merge course into existing courses
-            let finalCourses = student.courses || [];
-            const existingIndex = finalCourses.findIndex(
-                (c) => String(c.courseId) === String(courseData._id)
-            );
-
-            if (existingIndex > -1) {
-                finalCourses[existingIndex].grade = grade; // update grade
-            } else {
-                finalCourses.push({ courseId: courseData._id, grade });
-            }
-
-            // Check if still regular (grade must be between 1–3)
-            const hasInvalidGrade = finalCourses.some(c => c.grade === 0 || c.grade > 3);
-
-            const update = {
-                courses: finalCourses,
-                isRegular: !hasInvalidGrade,
-            };
-
-            // Update student document
-            await User.findOneAndUpdate(
-                { studentNumber },
-                { $set: update },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
+            const savedUser = await user.save();
+            updatedUsers.push(savedUser);
         }
 
-        res.json({ message: "Grades imported and processed successfully." });
+        console.log("UPDATED USERS:", updatedUsers);
+
+        res.status(200).json({
+            message: "Grades + sem/year saved successfully.",
+            updatedCount: updatedUsers.length,
+            data: updatedUsers
+        });
+
     } catch (error) {
-        console.error(error);
+        console.error("Insert Grade Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
+// exports.insertTest = async (req, res) => {
+//     try {
+//         if (!req.file) {
+//             return res.status(400).json({ error: "No file uploaded." });
+//         }
+
+//         const workbook = xlsx.read(req.file.buffer);
+//         const sheet = workbook.Sheets[workbook.SheetNames[0]];
+//         const rows = xlsx.utils.sheet_to_json(sheet, {
+//             header: ["studentNumber", "courseCode", "grade", "sem", "year"],
+//             range: 1,
+//         });
+
+//         const updatedUsers = [];
+
+//         for (const row of rows) {
+//             const {
+//                 studentNumber,
+//                 courseCode,
+//                 grade: rawGrade,
+//                 sem,
+//                 year
+//             } = row;
+
+//             if (!studentNumber || !courseCode) {
+//                 console.log("Invalid row (skipped):", row);
+//                 continue;
+//             }
+
+//             const grade = parseFloat(rawGrade);
+
+//             // Check if courseCode exists
+//             const course = await Course.findOne({ code: courseCode });
+//             if (!course) {
+//                 console.log(`CourseCode NOT found in database: ${courseCode}`);
+//                 continue;
+//             }
+
+//             const courseId = course._id.toString();
+
+//             // Find student
+//             const user = await User.findOne({ studentNumber });
+//             if (!user) {
+//                 console.log(`User not found: ${studentNumber}`);
+//                 continue;
+//             }
+
+//             // Check if course already exists in user's courses
+//             const existingCourse = user.courses.find(
+//                 (c) => c.courseId === courseId
+//             );
+
+//             if (existingCourse) {
+//                 // Update grade + sem + year
+//                 existingCourse.grade = grade;
+//                 existingCourse.sem = sem;
+//                 existingCourse.year = year;
+//             } else {
+//                 // Add new course entry with sem/year
+//                 user.courses.push({
+//                     courseId: courseId,
+//                     grade,
+//                     sem,
+//                     year
+//                 });
+//             }
+
+//             const savedUser = await user.save();
+//             updatedUsers.push(savedUser);
+//         }
+
+//         console.log("UPDATED USERS:", updatedUsers);
+
+//         res.status(200).json({
+//             message: "Grades + sem/year saved successfully.",
+//             updatedCount: updatedUsers.length,
+//             data: updatedUsers
+//         });
+
+//     } catch (error) {
+//         console.error("Insert Grade Error:", error);
+//         res.status(500).json({ error: "Internal Server Error" });
+//     }
+// };
+
 
 exports.clockIn = async (req, res) => {
     const { userId } = req.body;

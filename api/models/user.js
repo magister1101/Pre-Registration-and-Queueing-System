@@ -14,7 +14,7 @@ const userSchema = mongoose.Schema({
     role: { type: String, required: true, default: "student" }, //student, instructor, admin
     group: { type: String }, //if instructor this is the department
 
-    courses: [{ courseId: { type: String, ref: 'Course' }, grade: { type: Number } }], //if student this is the courses taken
+    courses: [{ courseId: { type: String, ref: 'Course' }, grade: { type: Number }, sem:{type: String}, year: {type: String} }], //if student this is the courses taken
     courseToTake: [{ type: String, ref: 'Course' }], //if student this is the courses to take
     courseToTakeRemoved: [{ type: String, ref: 'Course' }],
 
@@ -26,6 +26,22 @@ const userSchema = mongoose.Schema({
     section: { type: String }, //section of the program
 
     schedule: [{ type: String, ref: 'Schedule' }],
+
+    houseNumber: { type: String },
+    street: { type: String },
+    barangay: { type: String },
+    city: { type: String },
+    province: { type: String },
+    sex: { type: String },
+    birthDate: { type: Date },
+    elemenarySchool: { type: String },
+    highSchool: { type: String },
+    seniorHighSchool: { type: String },
+    schoolAddress: { type: String },
+    isYouIndigenous: { type: Boolean },
+    isDisabled: { type: Boolean },
+    isFirstCollegeGraduate: { type: Boolean },
+
 
     //for instructor
     window: { type: Number, default: 0 },
