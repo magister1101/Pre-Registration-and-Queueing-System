@@ -733,4 +733,117 @@ exports.testFunction = async (req, res) => {
 
 };
 
+exports.insertScheduleFromExcel = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
+
+        // Read Excel file
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        const rows = xlsx.utils.sheet_to_json(sheet, {
+            header: [
+                "code",
+                "course",     // this is the program code in the Excel (e.g., BSIT)
+                "section",
+                "room",
+                "day",
+                "startTime",
+                "endTime"
+            ],
+            range: 1
+        });
+
+        const scheduleMap = new Map();
+
+        // Step 1: Group schedules by (code + section)
+        for (const row of rows) {
+            const {
+                code,
+                course,      // Program code (BSIT / BSCS)
+                section,
+                room,
+                day,
+                startTime,
+                endTime
+            } = row;
+
+            if (!code || !course || !section || !room || !day || !startTime || !endTime) {
+                console.log("Skipping invalid row:", row);
+                continue;
+            }
+
+            const key = `${code}-${section}`;
+
+            if (!scheduleMap.has(key)) {
+                scheduleMap.set(key, {
+                    code,
+                    programCode: course, // store temporary program code
+                    section,
+                    schedule: []
+                });
+            }
+
+            scheduleMap.get(key).schedule.push({
+                room,
+                day,
+                startTime,
+                endTime
+            });
+        }
+
+        // Step 2: Save or update schedule entries
+        const savedSchedules = [];
+
+        for (const [key, value] of scheduleMap.entries()) {
+
+            // 🔥 Find the Program using the code from Excel
+            const programDoc = await Program.findOne({ code: value.programCode });
+
+            if (!programDoc) {
+                console.log(`Program not found for code: ${value.programCode}`);
+                continue;
+            }
+
+            let scheduleDoc = await Schedule.findOne({
+                code: value.code,
+                section: value.section,
+                isArchived: false
+            });
+
+            if (!scheduleDoc) {
+                // Create new schedule
+                scheduleDoc = new Schedule({
+                    _id: new mongoose.Types.ObjectId(),
+                    code: value.code,
+                    course: programDoc._id,   // 🔥 save program ID here
+                    section: value.section,
+                    schedule: value.schedule
+                });
+            } else {
+                // Update existing schedule (overwrite schedule array)
+                scheduleDoc.course = programDoc._id; // 🔥 update to program ID
+                scheduleDoc.schedule = value.schedule;
+            }
+
+            const saved = await scheduleDoc.save();
+            savedSchedules.push(saved);
+        }
+
+        return res.status(200).json({
+            message: "Schedules imported successfully.",
+            count: savedSchedules.length,
+            data: savedSchedules
+        });
+
+    } catch (error) {
+        console.error("Insert Schedule Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+
+
 

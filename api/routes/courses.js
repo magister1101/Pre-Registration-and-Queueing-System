@@ -30,7 +30,7 @@ router.put('/schedule/:scheduleId', CoursesController.updateSchedule);
 
 router.delete('/schedule/:scheduleId', CoursesController.deleteSchedule);
 
-router.post("/excel/importSchedules", upload.single("file"), CoursesController.insertSchedules);
+router.post("/excel/importSchedules", upload.single("file"), CoursesController.insertScheduleFromExcel);
 
 router.post('/createProgram', CoursesController.createProgram);
 
