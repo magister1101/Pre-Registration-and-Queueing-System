@@ -48,7 +48,7 @@ router.post('/rejectEmail/:id', UsersController.sendEmailReject);
 
 router.post('/excel/insertStudents', upload.single('file'), UsersController.insertStudents);
 
-router.post('/excel/insertGrades', upload.single('file'), UsersController.insertGradesByRow);
+router.post('/excel/insertGrades', upload.single('file'), UsersController.insertTest);
 
 router.post('/excel/test', upload.single('file'), UsersController.insertTest);
 

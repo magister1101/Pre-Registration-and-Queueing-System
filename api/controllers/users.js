@@ -1459,143 +1459,143 @@ exports.insertStudents = async (req, res) => {
     }
 };
 
-exports.insertTest = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded." });
-        }
+// exports.insertTest = async (req, res) => {
+//     try {
+//         if (!req.file) {
+//             return res.status(400).json({ error: "No file uploaded." });
+//         }
 
-        const workbook = xlsx.read(req.file.buffer);
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+//         const workbook = xlsx.read(req.file.buffer);
+//         const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-        const rows = xlsx.utils.sheet_to_json(sheet, {
-            header: [
-                "studentNumber",
-                "email",
-                "firstName",
-                "lastName",
-                "middleName",
-                "program",
-                "year",
-                "section",
-                "houseNumber",
-                "street",
-                "barangay",
-                "city",
-                "province",
-                "sex",
-                "birthDate",
-                "elemenarySchool",
-                "highSchool",
-                "seniorHighSchool",
-                "schoolAddress",
-                "isYouIndigenous",
-                "isDisabled",
-                "isFirstCollegeGraduate",
-                "isArchived",
-                "role"
-            ],
-            range: 1,
-        });
+//         const rows = xlsx.utils.sheet_to_json(sheet, {
+//             header: [
+//                 "studentNumber",
+//                 "email",
+//                 "firstName",
+//                 "lastName",
+//                 "middleName",
+//                 "program",
+//                 "year",
+//                 "section",
+//                 "houseNumber",
+//                 "street",
+//                 "barangay",
+//                 "city",
+//                 "province",
+//                 "sex",
+//                 "birthDate",
+//                 "elemenarySchool",
+//                 "highSchool",
+//                 "seniorHighSchool",
+//                 "schoolAddress",
+//                 "isYouIndigenous",
+//                 "isDisabled",
+//                 "isFirstCollegeGraduate",
+//                 "isArchived",
+//                 "role"
+//             ],
+//             range: 1,
+//         });
 
-        const updatedUsers = [];
+//         const updatedUsers = [];
 
-        for (const row of rows) {
-            const {
-                studentNumber,
-                email,
-                firstName,
-                lastName,
-                middleName,
-                program,
-                year,
-                section,
-                houseNumber,
-                street,
-                barangay,
-                city,
-                province,
-                sex,
-                birthDate,
-                elemenarySchool,
-                highSchool,
-                seniorHighSchool,
-                schoolAddress,
-                isYouIndigenous = "false",
-                isDisabled = "false",
-                isFirstCollegeGraduate = "false",
-                isArchived = "false",
-                role = "student"
-            } = row;
+//         for (const row of rows) {
+//             const {
+//                 studentNumber,
+//                 email,
+//                 firstName,
+//                 lastName,
+//                 middleName,
+//                 program,
+//                 year,
+//                 section,
+//                 houseNumber,
+//                 street,
+//                 barangay,
+//                 city,
+//                 province,
+//                 sex,
+//                 birthDate,
+//                 elemenarySchool,
+//                 highSchool,
+//                 seniorHighSchool,
+//                 schoolAddress,
+//                 isYouIndigenous = "false",
+//                 isDisabled = "false",
+//                 isFirstCollegeGraduate = "false",
+//                 isArchived = "false",
+//                 role = "student"
+//             } = row;
 
-            if (!studentNumber || !firstName || !lastName) {
-                console.log("Invalid row (skipped):", row);
-                continue;
-            }
+//             if (!studentNumber || !firstName || !lastName) {
+//                 console.log("Invalid row (skipped):", row);
+//                 continue;
+//             }
 
-            // FIND EXISTING USER
-            let user = await User.findOne({ studentNumber });
+//             // FIND EXISTING USER
+//             let user = await User.findOne({ studentNumber });
 
-            // CREATE NEW USER + _id
-            if (!user) {
-                console.log(`User not found, creating new: ${studentNumber}`);
+//             // CREATE NEW USER + _id
+//             if (!user) {
+//                 console.log(`User not found, creating new: ${studentNumber}`);
 
-                const userId = new mongoose.Types.ObjectId(); // <-- UNIQUE _id HERE
+//                 const userId = new mongoose.Types.ObjectId(); // <-- UNIQUE _id HERE
 
-                user = new User({
-                    _id: userId,                 // <-- SET NEW ID
-                    studentNumber,
-                    username: studentNumber,
-                    password: await bcrypt.hash(String(studentNumber), 10),
-                });
-            }
+//                 user = new User({
+//                     _id: userId,                 // <-- SET NEW ID
+//                     studentNumber,
+//                     username: studentNumber,
+//                     password: await bcrypt.hash(String(studentNumber), 10),
+//                 });
+//             }
 
-            // UPDATE FIELDS
-            user.email = email;
-            user.firstName = firstName;
-            user.lastName = lastName;
-            user.middleName = middleName;
-            user.course = program;
-            user.year = year;
-            user.section = section;
-            user.role = role;
+//             // UPDATE FIELDS
+//             user.email = email;
+//             user.firstName = firstName;
+//             user.lastName = lastName;
+//             user.middleName = middleName;
+//             user.course = program;
+//             user.year = year;
+//             user.section = section;
+//             user.role = role;
 
-            user.houseNumber = houseNumber;
-            user.street = street;
-            user.barangay = barangay;
-            user.city = city;
-            user.province = province;
+//             user.houseNumber = houseNumber;
+//             user.street = street;
+//             user.barangay = barangay;
+//             user.city = city;
+//             user.province = province;
 
-            user.sex = sex;
-            user.birthDate = birthDate ? new Date(birthDate) : null;
+//             user.sex = sex;
+//             user.birthDate = birthDate ? new Date(birthDate) : null;
 
-            user.elemenarySchool = elemenarySchool;
-            user.highSchool = highSchool;
-            user.seniorHighSchool = seniorHighSchool;
-            user.schoolAddress = schoolAddress;
+//             user.elemenarySchool = elemenarySchool;
+//             user.highSchool = highSchool;
+//             user.seniorHighSchool = seniorHighSchool;
+//             user.schoolAddress = schoolAddress;
 
-            user.isYouIndigenous = isYouIndigenous === "true" || isYouIndigenous === true;
-            user.isDisabled = isDisabled === "true" || isDisabled === true;
-            user.isFirstCollegeGraduate =
-                isFirstCollegeGraduate === "true" || isFirstCollegeGraduate === true;
+//             user.isYouIndigenous = isYouIndigenous === "true" || isYouIndigenous === true;
+//             user.isDisabled = isDisabled === "true" || isDisabled === true;
+//             user.isFirstCollegeGraduate =
+//                 isFirstCollegeGraduate === "true" || isFirstCollegeGraduate === true;
 
-            user.isArchived = isArchived === "true" || isArchived === true;
+//             user.isArchived = isArchived === "true" || isArchived === true;
 
-            const savedUser = await user.save();
-            updatedUsers.push(savedUser);
-        }
+//             const savedUser = await user.save();
+//             updatedUsers.push(savedUser);
+//         }
 
-        res.status(200).json({
-            message: "Student information saved successfully.",
-            updatedCount: updatedUsers.length,
-            data: updatedUsers
-        });
+//         res.status(200).json({
+//             message: "Student information saved successfully.",
+//             updatedCount: updatedUsers.length,
+//             data: updatedUsers
+//         });
 
-    } catch (error) {
-        console.error("Insert Student Info Error:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-};
+//     } catch (error) {
+//         console.error("Insert Student Info Error:", error);
+//         res.status(500).json({ error: "Internal Server Error" });
+//     }
+// };
 
 
 exports.insertGradesByRow = async (req, res) => {
@@ -1688,90 +1688,90 @@ exports.insertGradesByRow = async (req, res) => {
     }
 };
 
-// exports.insertTest = async (req, res) => {
-//     try {
-//         if (!req.file) {
-//             return res.status(400).json({ error: "No file uploaded." });
-//         }
+exports.insertTest = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: "No file uploaded." });
+        }
 
-//         const workbook = xlsx.read(req.file.buffer);
-//         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-//         const rows = xlsx.utils.sheet_to_json(sheet, {
-//             header: ["studentNumber", "courseCode", "grade", "sem", "year"],
-//             range: 1,
-//         });
+        const workbook = xlsx.read(req.file.buffer);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = xlsx.utils.sheet_to_json(sheet, {
+            header: ["studentNumber", "courseCode", "grade", "sem", "year"],
+            range: 1,
+        });
 
-//         const updatedUsers = [];
+        const updatedUsers = [];
 
-//         for (const row of rows) {
-//             const {
-//                 studentNumber,
-//                 courseCode,
-//                 grade: rawGrade,
-//                 sem,
-//                 year
-//             } = row;
+        for (const row of rows) {
+            const {
+                studentNumber,
+                courseCode,
+                grade: rawGrade,
+                sem,
+                year
+            } = row;
 
-//             if (!studentNumber || !courseCode) {
-//                 console.log("Invalid row (skipped):", row);
-//                 continue;
-//             }
+            if (!studentNumber || !courseCode) {
+                console.log("Invalid row (skipped):", row);
+                continue;
+            }
 
-//             const grade = parseFloat(rawGrade);
+            const grade = parseFloat(rawGrade);
 
-//             // Check if courseCode exists
-//             const course = await Course.findOne({ code: courseCode });
-//             if (!course) {
-//                 console.log(`CourseCode NOT found in database: ${courseCode}`);
-//                 continue;
-//             }
+            // Check if courseCode exists
+            const course = await Course.findOne({ code: courseCode });
+            if (!course) {
+                console.log(`CourseCode NOT found in database: ${courseCode}`);
+                continue;
+            }
 
-//             const courseId = course._id.toString();
+            const courseId = course._id.toString();
 
-//             // Find student
-//             const user = await User.findOne({ studentNumber });
-//             if (!user) {
-//                 console.log(`User not found: ${studentNumber}`);
-//                 continue;
-//             }
+            // Find student
+            const user = await User.findOne({ studentNumber });
+            if (!user) {
+                console.log(`User not found: ${studentNumber}`);
+                continue;
+            }
 
-//             // Check if course already exists in user's courses
-//             const existingCourse = user.courses.find(
-//                 (c) => c.courseId === courseId
-//             );
+            // Check if course already exists in user's courses
+            const existingCourse = user.courses.find(
+                (c) => c.courseId === courseId
+            );
 
-//             if (existingCourse) {
-//                 // Update grade + sem + year
-//                 existingCourse.grade = grade;
-//                 existingCourse.sem = sem;
-//                 existingCourse.year = year;
-//             } else {
-//                 // Add new course entry with sem/year
-//                 user.courses.push({
-//                     courseId: courseId,
-//                     grade,
-//                     sem,
-//                     year
-//                 });
-//             }
+            if (existingCourse) {
+                // Update grade + sem + year
+                existingCourse.grade = grade;
+                existingCourse.sem = sem;
+                existingCourse.year = year;
+            } else {
+                // Add new course entry with sem/year
+                user.courses.push({
+                    courseId: courseId,
+                    grade,
+                    sem,
+                    year
+                });
+            }
 
-//             const savedUser = await user.save();
-//             updatedUsers.push(savedUser);
-//         }
+            const savedUser = await user.save();
+            updatedUsers.push(savedUser);
+        }
 
-//         console.log("UPDATED USERS:", updatedUsers);
+        console.log("UPDATED USERS:", updatedUsers);
 
-//         res.status(200).json({
-//             message: "Grades + sem/year saved successfully.",
-//             updatedCount: updatedUsers.length,
-//             data: updatedUsers
-//         });
+        res.status(200).json({
+            message: "Grades + sem/year saved successfully.",
+            updatedCount: updatedUsers.length,
+            data: updatedUsers
+        });
 
-//     } catch (error) {
-//         console.error("Insert Grade Error:", error);
-//         res.status(500).json({ error: "Internal Server Error" });
-//     }
-// };
+    } catch (error) {
+        console.error("Insert Grade Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 
 
 exports.clockIn = async (req, res) => {

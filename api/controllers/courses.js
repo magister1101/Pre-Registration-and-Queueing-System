@@ -676,7 +676,7 @@ exports.insertSchedules = async (req, res) => {
                 groupedSchedules[key] = {
                     _id: new mongoose.Types.ObjectId(),
                     code,
-                    course: courseDoc._id, // ✅ store course as ObjectId
+                    course: courseDoc._id,
                     section,
                     schedule: [],
                 };
@@ -702,7 +702,7 @@ exports.insertSchedules = async (req, res) => {
 };
 
 exports.testFunction = async (req, res) => {
-    
+
     try {
         const number = 2;
 
@@ -710,7 +710,7 @@ exports.testFunction = async (req, res) => {
             return res.status(400).json({
                 message: "Number is equal to 1",
             });
-        }else{
+        } else {
             return res.status(200).json({
                 message: "Number is not equal to 1",
             });
@@ -721,7 +721,7 @@ exports.testFunction = async (req, res) => {
             number: number,
         });
 
-        
+
     }
     catch (error) {
         console.error('Error in test function:', error);
@@ -739,110 +739,199 @@ exports.insertScheduleFromExcel = async (req, res) => {
             return res.status(400).json({ error: "No file uploaded." });
         }
 
-        // Read Excel file
+        /* ===============================
+           🔹 GET SEMESTER INFO
+        =============================== */
+
+        const currentYear = new Date().getFullYear();
+
+        const semesterDoc = await Semester.findOne();
+        if (!semesterDoc) {
+            return res.status(400).json({ message: "No semester found" });
+        }
+
+        const semesterName = semesterDoc.semester.trim().toLowerCase();
+
+        const semesterMap = {
+            first: "0",
+            second: "1",
+            summer: "2",
+        };
+
+        const semCode = semesterMap[semesterName];
+        if (semCode === undefined) {
+            return res.status(400).json({
+                message: `Invalid semester value: ${semesterDoc.semester}`
+            });
+        }
+
+        /* ===============================
+           🔹 READ EXCEL
+        =============================== */
+
         const workbook = xlsx.read(req.file.buffer);
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-        const rows = xlsx.utils.sheet_to_json(sheet, {
-            header: [
-                "code",
-                "course",     // this is the program code in the Excel (e.g., BSIT)
-                "section",
-                "room",
-                "day",
-                "startTime",
-                "endTime"
-            ],
-            range: 1
-        });
+        const rows = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
-        const scheduleMap = new Map();
+        if (!rows.length) {
+            return res.status(400).json({ message: "Excel file is empty" });
+        }
 
-        // Step 1: Group schedules by (code + section)
+        /* ===============================
+           🔹 VALIDATE REQUIRED HEADERS
+        =============================== */
+
+        const requiredHeaders = ["code", "course", "section", "room", "day", "startTime", "endTime"];
+        const excelHeaders = Object.keys(rows[0]);
+
+        const missingHeaders = requiredHeaders.filter(h => !excelHeaders.includes(h));
+        if (missingHeaders.length) {
+            return res.status(400).json({
+                message: "Invalid Excel format",
+                missingHeaders
+            });
+        }
+
+        /* ===============================
+           🔹 GET COURSE IDS FOR ALL COURSES IN EXCEL
+        =============================== */
+
+        // Collect all unique subject codes from Excel
+        const courseCodes = [...new Set(rows.map(r => r.code))];
+        
+        // Find all courses at once for better performance
+        const courses = await Course.find({ code: { $in: courseCodes } });
+        
+        // Create a map of course code to course ID for easy lookup
+        const courseMap = {};
+        const missingCourses = [];
+        
+        for (const courseCode of courseCodes) {
+            const course = courses.find(c => c.code === courseCode);
+            if (course) {
+                courseMap[courseCode] = course._id;
+            } else {
+                missingCourses.push(courseCode);
+            }
+        }
+
+        if (missingCourses.length > 0) {
+            console.log("Missing courses:", missingCourses);
+            return res.status(400).json({
+                message: "Some courses do not exist in the database",
+                missingCourses
+            });
+        }
+
+        /* ===============================
+           🔹 GROUP BY SECTION AND PREPARE FOR SCHEDULE GENERATION
+        =============================== */
+
+        const scheduleGroups = []; // Array to hold grouped schedules
+
         for (const row of rows) {
-            const {
-                code,
-                course,      // Program code (BSIT / BSCS)
-                section,
-                room,
-                day,
-                startTime,
-                endTime
-            } = row;
+            const { code: courseCode, course: courseName, section, room, day, startTime, endTime } = row;
 
-            if (!code || !course || !section || !room || !day || !startTime || !endTime) {
+            if (!courseName || !section || !room || !day || !startTime || !endTime) {
                 console.log("Skipping invalid row:", row);
                 continue;
             }
 
-            const key = `${code}-${section}`;
-
-            if (!scheduleMap.has(key)) {
-                scheduleMap.set(key, {
-                    code,
-                    programCode: course, // store temporary program code
-                    section,
-                    schedule: []
-                });
-            }
-
-            scheduleMap.get(key).schedule.push({
-                room,
-                day,
-                startTime,
-                endTime
-            });
-        }
-
-        // Step 2: Save or update schedule entries
-        const savedSchedules = [];
-
-        for (const [key, value] of scheduleMap.entries()) {
-
-            // 🔥 Find the Program using the code from Excel
-            const programDoc = await Program.findOne({ code: value.programCode });
-
-            if (!programDoc) {
-                console.log(`Program not found for code: ${value.programCode}`);
+            // Get course ID from the map
+            const courseId = courseMap[courseCode];
+            if (!courseId) {
+                console.log(`Course ID not found for code: ${courseCode}`);
                 continue;
             }
 
-            let scheduleDoc = await Schedule.findOne({
-                code: value.code,
-                section: value.section,
-                isArchived: false
-            });
+            // Find existing group for this course-section combination
+            let group = scheduleGroups.find(g => 
+                g.courseId.toString() === courseId.toString() && 
+                g.section === section
+            );
 
-            if (!scheduleDoc) {
-                // Create new schedule
-                scheduleDoc = new Schedule({
-                    _id: new mongoose.Types.ObjectId(),
-                    code: value.code,
-                    course: programDoc._id,   // 🔥 save program ID here
-                    section: value.section,
-                    schedule: value.schedule
-                });
-            } else {
-                // Update existing schedule (overwrite schedule array)
-                scheduleDoc.course = programDoc._id; // 🔥 update to program ID
-                scheduleDoc.schedule = value.schedule;
+            if (!group) {
+                group = {
+                    courseId: courseId,
+                    courseCode: courseCode,
+                    courseName: courseName,
+                    section: section,
+                    scheduleItems: []
+                };
+                scheduleGroups.push(group);
             }
 
+            group.scheduleItems.push({
+                room: room.trim(),
+                day: day.trim(),
+                startTime: startTime.trim(),
+                endTime: endTime.trim()
+            });
+        }
+
+        /* ===============================
+           🔹 GENERATE UNIQUE CODES FOR EACH SECTION
+        =============================== */
+
+        // Get current counter value
+        let counter = await SchedCounter.findOne();
+        if (!counter) {
+            counter = new SchedCounter({ value: 0 });
+        }
+
+        const savedSchedules = [];
+
+        // Generate unique code for each group
+        for (const group of scheduleGroups) {
+            // Increment counter for each new schedule
+            counter.value += 1;
+            await counter.save();
+
+            const counterPadded = String(counter.value).padStart(5, "0");
+            const generatedCode = `${currentYear}${semCode}${counterPadded}`;
+
+            /* ===============================
+               🔹 SAVE TO DB WITH UNIQUE CODE
+            =============================== */
+
+            const scheduleDoc = new Schedule({
+                _id: new mongoose.Types.ObjectId(),
+                code: generatedCode, // Unique code for each section
+                course: group.courseId,
+                section: group.section,
+                schedule: group.scheduleItems
+            });
+
             const saved = await scheduleDoc.save();
-            savedSchedules.push(saved);
+            savedSchedules.push({
+                ...saved.toObject(),
+                courseCode: group.courseCode,
+                courseName: group.courseName
+            });
         }
 
         return res.status(200).json({
             message: "Schedules imported successfully.",
             count: savedSchedules.length,
-            data: savedSchedules
+            data: savedSchedules.map(s => ({
+                scheduleId: s._id,
+                code: s.code,
+                courseCode: s.courseCode,
+                courseName: s.courseName,
+                section: s.section,
+                scheduleItems: s.schedule.length
+            }))
         });
 
     } catch (error) {
         console.error("Insert Schedule Error:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
+
+
 
 
 
