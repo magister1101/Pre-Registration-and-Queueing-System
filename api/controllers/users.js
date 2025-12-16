@@ -1362,6 +1362,57 @@ exports.insertStudents = async (req, res) => {
 
         const updatedUsers = [];
 
+        // Helper function to parse date strings
+        const parseDateString = (dateStr) => {
+            if (!dateStr) return null;
+            
+            // Remove any extra spaces
+            dateStr = String(dateStr).trim();
+            
+            // Try ISO format first (YYYY-MM-DD)
+            if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const date = new Date(dateStr);
+                if (!isNaN(date.getTime())) return date;
+            }
+            
+            // Try US format (MM/DD/YYYY)
+            if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                const parts = dateStr.split('/');
+                const date = new Date(parts[2], parts[0] - 1, parts[1]);
+                if (!isNaN(date.getTime())) return date;
+            }
+            
+            // Try International format (DD/MM/YYYY)
+            if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                const parts = dateStr.split('/');
+                const date = new Date(parts[2], parts[1] - 1, parts[0]);
+                if (!isNaN(date.getTime())) return date;
+            }
+            
+            // Try Excel serial number (if it's a number)
+            const num = Number(dateStr);
+            if (!isNaN(num) && num > 0) {
+                // Excel serial to JS date (Excel epoch is 1899-12-30)
+                const excelEpoch = new Date(1899, 11, 30);
+                const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
+                if (!isNaN(date.getTime())) return date;
+            }
+            
+            return null;
+        };
+
+        // Helper function to convert to boolean
+        const toBoolean = (value) => {
+            if (value === undefined || value === null) return false;
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'string') {
+                const trimmed = value.trim().toLowerCase();
+                return trimmed === 'true' || trimmed === 'yes' || trimmed === '1';
+            }
+            if (typeof value === 'number') return value === 1;
+            return false;
+        };
+
         for (const row of rows) {
             const {
                 studentNumber,
@@ -1383,10 +1434,10 @@ exports.insertStudents = async (req, res) => {
                 highSchool,
                 seniorHighSchool,
                 schoolAddress,
-                isYouIndigenous = "false",
-                isDisabled = "false",
-                isFirstCollegeGraduate = "false",
-                isArchived = "false",
+                isYouIndigenous,
+                isDisabled,
+                isFirstCollegeGraduate,
+                isArchived,
                 role = "student"
             } = row;
 
@@ -1402,10 +1453,10 @@ exports.insertStudents = async (req, res) => {
             if (!user) {
                 console.log(`User not found, creating new: ${studentNumber}`);
 
-                const userId = new mongoose.Types.ObjectId(); // <-- UNIQUE _id HERE
+                const userId = new mongoose.Types.ObjectId();
 
                 user = new User({
-                    _id: userId,                 // <-- SET NEW ID
+                    _id: userId,
                     studentNumber,
                     username: studentNumber,
                     password: await bcrypt.hash(String(studentNumber), 10),
@@ -1429,22 +1480,29 @@ exports.insertStudents = async (req, res) => {
             user.province = province;
 
             user.sex = sex;
-            user.birthDate = birthDate ? new Date(birthDate) : null;
+            // Use the date parser instead of direct Date constructor
+            user.birthDate = parseDateString(birthDate);
 
             user.elemenarySchool = elemenarySchool;
             user.highSchool = highSchool;
             user.seniorHighSchool = seniorHighSchool;
             user.schoolAddress = schoolAddress;
 
-            user.isYouIndigenous = isYouIndigenous === "true" || isYouIndigenous === true;
-            user.isDisabled = isDisabled === "true" || isDisabled === true;
-            user.isFirstCollegeGraduate =
-                isFirstCollegeGraduate === "true" || isFirstCollegeGraduate === true;
+            // Use boolean converter for all boolean fields
+            user.isYouIndigenous = toBoolean(isYouIndigenous);
+            user.isDisabled = toBoolean(isDisabled);
+            user.isFirstCollegeGraduate = toBoolean(isFirstCollegeGraduate);
+            user.isArchived = toBoolean(isArchived);
 
-            user.isArchived = isArchived === "true" || isArchived === true;
-
-            const savedUser = await user.save();
-            updatedUsers.push(savedUser);
+            try {
+                const savedUser = await user.save();
+                updatedUsers.push(savedUser);
+                console.log(`Successfully processed: ${studentNumber} - ${firstName} ${lastName}`);
+            } catch (saveError) {
+                console.error(`Error saving user ${studentNumber}:`, saveError.message);
+                // Continue with next user instead of stopping entire process
+                continue;
+            }
         }
 
         res.status(200).json({
@@ -1455,7 +1513,10 @@ exports.insertStudents = async (req, res) => {
 
     } catch (error) {
         console.error("Insert Student Info Error:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ 
+            error: "Internal Server Error",
+            details: error.message 
+        });
     }
 };
 
