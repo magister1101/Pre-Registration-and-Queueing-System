@@ -34,7 +34,7 @@ const userSchema = mongoose.Schema({
     province: { type: String },
     sex: { type: String },
     birthDate: { type: Date },
-    elemenarySchool: { type: String },
+    elementarySchool: { type: String },
     highSchool: { type: String },
     seniorHighSchool: { type: String },
     schoolAddress: { type: String },

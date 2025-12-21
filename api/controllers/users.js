@@ -479,17 +479,75 @@ exports.myProfile = async (req, res) => {
     }
 };
 
+// exports.createUser = async (req, res, next) => {
+//     try {
+//         const existingUser = await User.find({
+//             $or: [{ username: req.body.username }]
+//         });
+
+//         if (existingUser.length > 0) {
+//             return res.status(400).json({ message: "User already exists" });
+//         }
+
+//         const hashedPassword = await bcrypt.hash(req.body.username, 10);
+
+//         const userId = new mongoose.Types.ObjectId();
+//         const user = new User({
+//             _id: userId,
+//             username: req.body.username,
+//             password: hashedPassword,
+//             email: req.body.email,
+//             firstName: req.body.firstName,
+//             lastName: req.body.lastName,
+//             middleName: req.body.middleName,
+//             file: req.body.file,
+
+//             role: req.body.role,
+//             group: req.body.group,
+
+//             courses: req.body.courses,
+
+//             studentNumber: req.body.studentNumber,
+//             course: req.body.course,
+//             year: req.body.year,
+//             section: req.body.section,
+
+//             isRegular: req.body.isRegular,
+//             isEmailSent: req.body.isEmailSent,
+//             isArchived: req.body.isArchived,
+//         });
+
+//         const saveUser = await user.save();
+
+//         return res.status(201).json({
+//             saveUser
+//         });
+
+//     }
+//     catch (error) {
+//         console.error('Error creating user:', error);
+//         return res.status(500).json({
+//             message: "Error in creating user",
+//             error: error.message || error,
+//         });
+//     }
+// };
+
 exports.createUser = async (req, res, next) => {
     try {
         const existingUser = await User.find({
-            $or: [{ username: req.body.username }]
+            $or: [
+                { username: req.body.username },
+                { email: req.body.email },
+                { studentNumber: req.body.studentNumber }
+            ]
         });
 
         if (existingUser.length > 0) {
             return res.status(400).json({ message: "User already exists" });
         }
 
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        const hashedPassword = await bcrypt.hash(req.body.username, 10);
 
         const userId = new mongoose.Types.ObjectId();
         const user = new User({
@@ -512,6 +570,29 @@ exports.createUser = async (req, res, next) => {
             year: req.body.year,
             section: req.body.section,
 
+            // Address fields
+            houseNumber: req.body.houseNumber,
+            street: req.body.street,
+            barangay: req.body.barangay,
+            city: req.body.city,
+            province: req.body.province,
+
+            // Personal information
+            sex: req.body.sex,
+            birthDate: req.body.birthDate,
+
+            // Educational background
+            elementarySchool: req.body.elementarySchool,
+            highSchool: req.body.highSchool,
+            seniorHighSchool: req.body.seniorHighSchool,
+            schoolAddress: req.body.schoolAddress,
+
+            // Boolean flags
+            isYouIndigenous: req.body.isYouIndigenous,
+            isDisabled: req.body.isDisabled,
+            isFirstCollegeGraduate: req.body.isFirstCollegeGraduate,
+
+            // Status flags
             isRegular: req.body.isRegular,
             isEmailSent: req.body.isEmailSent,
             isArchived: req.body.isArchived,
@@ -519,6 +600,7 @@ exports.createUser = async (req, res, next) => {
 
         const saveUser = await user.save();
 
+        console.log(saveUser);
         return res.status(201).json({
             saveUser
         });
