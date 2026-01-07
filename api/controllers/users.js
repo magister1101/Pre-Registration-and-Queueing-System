@@ -533,6 +533,121 @@ exports.myProfile = async (req, res) => {
 //     }
 // };
 
+exports.createAdminUser = async (req, res, next) => {
+    try {
+        console.log('createAdminUser called with:', req.body);
+        
+        // Validate required fields
+        if (!req.body.username || !req.body.email || !req.body.password || !req.body.firstName || !req.body.lastName || !req.body.role) {
+            return res.status(400).json({ 
+                message: "Missing required fields",
+                details: {
+                    username: !req.body.username,
+                    email: !req.body.email,
+                    password: !req.body.password,
+                    firstName: !req.body.firstName,
+                    lastName: !req.body.lastName,
+                    role: !req.body.role
+                }
+            });
+        }
+
+        // Validate admin role
+        const adminRoles = ['admin', 'registrar', 'admission', 'cashier'];
+        if (!adminRoles.includes(req.body.role)) {
+            return res.status(400).json({ 
+                message: "Invalid role for admin account",
+                receivedRole: req.body.role,
+                validRoles: adminRoles
+            });
+        }
+
+        // Check for existing user (only username and email, no studentNumber)
+        // Trim and normalize inputs
+        const trimmedUsername = req.body.username.trim();
+        const trimmedEmail = req.body.email.trim().toLowerCase();
+        
+        // Use findOne with exact match - only check if values are not empty
+        const existingUserByUsername = trimmedUsername 
+            ? await User.findOne({ username: trimmedUsername })
+            : null;
+        
+        const existingUserByEmail = trimmedEmail 
+            ? await User.findOne({ email: trimmedEmail })
+            : null;
+
+        if (existingUserByUsername || existingUserByEmail) {
+            const conflictingFields = [];
+            if (existingUserByUsername) {
+                conflictingFields.push('username');
+                console.log('Username conflict:', existingUserByUsername.username);
+            }
+            if (existingUserByEmail) {
+                conflictingFields.push('email');
+                console.log('Email conflict:', existingUserByEmail.email);
+            }
+            return res.status(400).json({ 
+                message: "User already exists",
+                conflictingFields: conflictingFields
+            });
+        }
+
+        // Hash password correctly
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+
+        const userId = new mongoose.Types.ObjectId();
+        const user = new User({
+            _id: userId,
+            username: req.body.username.trim(),
+            password: hashedPassword,
+            email: req.body.email.trim().toLowerCase(),
+            firstName: req.body.firstName.trim(),
+            lastName: req.body.lastName.trim(),
+            middleName: req.body.middleName ? req.body.middleName.trim() : '',
+            role: req.body.role,
+            isArchived: req.body.isArchived || false,
+        });
+
+        const saveUser = await user.save();
+
+        // console.log('Admin user created successfully:', saveUser);
+        return res.status(201).json({
+            message: "Admin account created successfully",
+            saveUser
+        });
+
+    }
+    catch (error) {
+        // console.error('Error creating admin user:', error);
+        
+        // Handle Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const validationErrors = {};
+            Object.keys(error.errors).forEach(key => {
+                validationErrors[key] = error.errors[key].message;
+            });
+            return res.status(400).json({
+                message: "Validation error",
+                errors: validationErrors
+            });
+        }
+        
+        // Handle duplicate key errors (unique constraint violations)
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyPattern)[0];
+            return res.status(400).json({
+                message: `${field} already exists`,
+                field: field
+            });
+        }
+        
+        return res.status(500).json({
+            message: "Error in creating admin account",
+            error: error.message || error,
+        });
+    }
+};
+
 exports.createUser = async (req, res, next) => {
     try {
         const existingUser = await User.find({
@@ -547,7 +662,9 @@ exports.createUser = async (req, res, next) => {
             return res.status(400).json({ message: "User already exists" });
         }
 
-        const hashedPassword = await bcrypt.hash(req.body.username, 10);
+        // Fix: Use password instead of username for hashing
+        const passwordToHash = req.body.password || req.body.username;
+        const hashedPassword = await bcrypt.hash(passwordToHash, 10);
 
         const userId = new mongoose.Types.ObjectId();
         const user = new User({

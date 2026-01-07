@@ -23,6 +23,7 @@ router.get('/resetQueue', checkAuth, UsersController.resetQueueCounter);
 router.get('/getTransactionLogs', UsersController.getTransactionLogs);
 
 router.post('/create', UsersController.createUser);
+router.post('/createAdmin', UsersController.createAdminUser);
 
 router.post('/update/:userId', UsersController.updateUser);
 
