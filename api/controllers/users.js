@@ -535,6 +535,21 @@ exports.myProfile = async (req, res) => {
 
 exports.createUser = async (req, res, next) => {
     try {
+        // Validate required fields
+        if (!req.body.username || !req.body.email) {
+            return res.status(400).json({ 
+                message: "Username and email are required" 
+            });
+        }
+
+        // If password is not provided, use username/studentNumber as default password
+        // This is useful for student accounts created by admin
+        let passwordToHash = req.body.password;
+        if (!passwordToHash || typeof passwordToHash !== 'string' || passwordToHash.trim() === '') {
+            // Use studentNumber if available, otherwise use username
+            passwordToHash = req.body.studentNumber || req.body.username;
+        }
+
         // Build query conditions, only check studentNumber if provided and not empty
         const queryConditions = [
             { username: req.body.username },
@@ -556,7 +571,7 @@ exports.createUser = async (req, res, next) => {
             return res.status(400).json({ message: "User already exists" });
         }
 
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        const hashedPassword = await bcrypt.hash(passwordToHash, 10);
 
         const userId = new mongoose.Types.ObjectId();
         const userData = {
