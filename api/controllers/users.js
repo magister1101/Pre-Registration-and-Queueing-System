@@ -533,188 +533,88 @@ exports.myProfile = async (req, res) => {
 //     }
 // };
 
-exports.createAdminUser = async (req, res, next) => {
-    try {
-        console.log('createAdminUser called with:', req.body);
-        
-        // Validate required fields
-        if (!req.body.username || !req.body.email || !req.body.password || !req.body.firstName || !req.body.lastName || !req.body.role) {
-            return res.status(400).json({ 
-                message: "Missing required fields",
-                details: {
-                    username: !req.body.username,
-                    email: !req.body.email,
-                    password: !req.body.password,
-                    firstName: !req.body.firstName,
-                    lastName: !req.body.lastName,
-                    role: !req.body.role
-                }
-            });
-        }
-
-        // Validate admin role
-        const adminRoles = ['admin', 'registrar', 'admission', 'cashier'];
-        if (!adminRoles.includes(req.body.role)) {
-            return res.status(400).json({ 
-                message: "Invalid role for admin account",
-                receivedRole: req.body.role,
-                validRoles: adminRoles
-            });
-        }
-
-        // Check for existing user (only username and email, no studentNumber)
-        // Trim and normalize inputs
-        const trimmedUsername = req.body.username.trim();
-        const trimmedEmail = req.body.email.trim().toLowerCase();
-        
-        // Use findOne with exact match - only check if values are not empty
-        const existingUserByUsername = trimmedUsername 
-            ? await User.findOne({ username: trimmedUsername })
-            : null;
-        
-        const existingUserByEmail = trimmedEmail 
-            ? await User.findOne({ email: trimmedEmail })
-            : null;
-
-        if (existingUserByUsername || existingUserByEmail) {
-            const conflictingFields = [];
-            if (existingUserByUsername) {
-                conflictingFields.push('username');
-                console.log('Username conflict:', existingUserByUsername.username);
-            }
-            if (existingUserByEmail) {
-                conflictingFields.push('email');
-                console.log('Email conflict:', existingUserByEmail.email);
-            }
-            return res.status(400).json({ 
-                message: "User already exists",
-                conflictingFields: conflictingFields
-            });
-        }
-
-        // Hash password correctly
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
-
-        const userId = new mongoose.Types.ObjectId();
-        const user = new User({
-            _id: userId,
-            username: req.body.username.trim(),
-            password: hashedPassword,
-            email: req.body.email.trim().toLowerCase(),
-            firstName: req.body.firstName.trim(),
-            lastName: req.body.lastName.trim(),
-            middleName: req.body.middleName ? req.body.middleName.trim() : '',
-            role: req.body.role,
-            isArchived: req.body.isArchived || false,
-        });
-
-        const saveUser = await user.save();
-
-        // console.log('Admin user created successfully:', saveUser);
-        return res.status(201).json({
-            message: "Admin account created successfully",
-            saveUser
-        });
-
-    }
-    catch (error) {
-        // console.error('Error creating admin user:', error);
-        
-        // Handle Mongoose validation errors
-        if (error.name === 'ValidationError') {
-            const validationErrors = {};
-            Object.keys(error.errors).forEach(key => {
-                validationErrors[key] = error.errors[key].message;
-            });
-            return res.status(400).json({
-                message: "Validation error",
-                errors: validationErrors
-            });
-        }
-        
-        // Handle duplicate key errors (unique constraint violations)
-        if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern)[0];
-            return res.status(400).json({
-                message: `${field} already exists`,
-                field: field
-            });
-        }
-        
-        return res.status(500).json({
-            message: "Error in creating admin account",
-            error: error.message || error,
-        });
-    }
-};
-
 exports.createUser = async (req, res, next) => {
     try {
+        // Build query conditions, only check studentNumber if provided and not empty
+        const queryConditions = [
+            { username: req.body.username },
+            { email: req.body.email }
+        ];
+        
+        // Only check studentNumber if it's provided and not a placeholder
+        if (req.body.studentNumber && 
+            req.body.studentNumber.trim() !== '' && 
+            !req.body.studentNumber.startsWith('NON-STUDENT-')) {
+            queryConditions.push({ studentNumber: req.body.studentNumber });
+        }
+
         const existingUser = await User.find({
-            $or: [
-                { username: req.body.username },
-                { email: req.body.email },
-                { studentNumber: req.body.studentNumber }
-            ]
+            $or: queryConditions
         });
 
         if (existingUser.length > 0) {
             return res.status(400).json({ message: "User already exists" });
         }
 
-        // Fix: Use password instead of username for hashing
-        const passwordToHash = req.body.password || req.body.username;
-        const hashedPassword = await bcrypt.hash(passwordToHash, 10);
+        const hashedPassword = await bcrypt.hash(req.body.username, 10);
 
         const userId = new mongoose.Types.ObjectId();
-        const user = new User({
+        const userData = {
             _id: userId,
             username: req.body.username,
             password: hashedPassword,
             email: req.body.email,
             firstName: req.body.firstName,
             lastName: req.body.lastName,
-            middleName: req.body.middleName,
-            file: req.body.file,
-
             role: req.body.role,
-            group: req.body.group,
+        };
 
-            courses: req.body.courses,
+        // Only add optional fields if they are provided and not empty
+        if (req.body.middleName) userData.middleName = req.body.middleName;
+        if (req.body.file) userData.file = req.body.file;
+        if (req.body.group) userData.group = req.body.group;
+        if (req.body.courses) userData.courses = req.body.courses;
+        
+        // Handle studentNumber: if provided, use it; otherwise generate unique placeholder for non-student accounts
+        if (req.body.studentNumber && req.body.studentNumber.trim() !== '') {
+            userData.studentNumber = req.body.studentNumber;
+        } else {
+            // Generate unique placeholder for admin/cashier accounts to avoid null duplicate key error
+            // Format: NON-STUDENT-{userId} to ensure uniqueness
+            userData.studentNumber = `NON-STUDENT-${userId.toString()}`;
+        }
+        if (req.body.course) userData.course = req.body.course;
+        if (req.body.year) userData.year = req.body.year;
+        if (req.body.section) userData.section = req.body.section;
+        
+        // Address fields
+        if (req.body.houseNumber) userData.houseNumber = req.body.houseNumber;
+        if (req.body.street) userData.street = req.body.street;
+        if (req.body.barangay) userData.barangay = req.body.barangay;
+        if (req.body.city) userData.city = req.body.city;
+        if (req.body.province) userData.province = req.body.province;
+        
+        // Personal information
+        if (req.body.sex) userData.sex = req.body.sex;
+        if (req.body.birthDate) userData.birthDate = req.body.birthDate;
+        
+        // Educational background
+        if (req.body.elementarySchool) userData.elementarySchool = req.body.elementarySchool;
+        if (req.body.highSchool) userData.highSchool = req.body.highSchool;
+        if (req.body.seniorHighSchool) userData.seniorHighSchool = req.body.seniorHighSchool;
+        if (req.body.schoolAddress) userData.schoolAddress = req.body.schoolAddress;
+        
+        // Boolean flags
+        if (req.body.isYouIndigenous !== undefined) userData.isYouIndigenous = req.body.isYouIndigenous;
+        if (req.body.isDisabled !== undefined) userData.isDisabled = req.body.isDisabled;
+        if (req.body.isFirstCollegeGraduate !== undefined) userData.isFirstCollegeGraduate = req.body.isFirstCollegeGraduate;
+        
+        // Status flags
+        if (req.body.isRegular !== undefined) userData.isRegular = req.body.isRegular;
+        if (req.body.isEmailSent !== undefined) userData.isEmailSent = req.body.isEmailSent;
+        if (req.body.isArchived !== undefined) userData.isArchived = req.body.isArchived;
 
-            studentNumber: req.body.studentNumber,
-            course: req.body.course,
-            year: req.body.year,
-            section: req.body.section,
-
-            // Address fields
-            houseNumber: req.body.houseNumber,
-            street: req.body.street,
-            barangay: req.body.barangay,
-            city: req.body.city,
-            province: req.body.province,
-
-            // Personal information
-            sex: req.body.sex,
-            birthDate: req.body.birthDate,
-
-            // Educational background
-            elementarySchool: req.body.elementarySchool,
-            highSchool: req.body.highSchool,
-            seniorHighSchool: req.body.seniorHighSchool,
-            schoolAddress: req.body.schoolAddress,
-
-            // Boolean flags
-            isYouIndigenous: req.body.isYouIndigenous,
-            isDisabled: req.body.isDisabled,
-            isFirstCollegeGraduate: req.body.isFirstCollegeGraduate,
-
-            // Status flags
-            isRegular: req.body.isRegular,
-            isEmailSent: req.body.isEmailSent,
-            isArchived: req.body.isArchived,
-        });
-
+        const user = new User(userData);
         const saveUser = await user.save();
 
         console.log(saveUser);
