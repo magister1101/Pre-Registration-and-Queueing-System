@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const xlsx = require('xlsx');
 
 const { transporter, customEmailtemplate, generateEmailTemplate, generateEmailTemplateInvalidCredentials } = require('../utils/email');
+const { isValidCVSUGrade, isFailingGrade, getGradeDescription, hasFailingGrades } = require('../utils/cvsuGrading');
 
 const User = require('../models/user');
 const Course = require('../models/course');
@@ -196,7 +197,7 @@ exports.sendEmailReject = async (req, res) => {
             html: generateEmailTemplateInvalidCredentials(studentName)
         };
 
-        performUpdate(id, { isEmailSent: false }, res);
+        await performUpdate(id, { isEmailSent: false });
 
         await new Promise((resolve, reject) => {
             // send mail
@@ -222,21 +223,16 @@ exports.sendEmailReject = async (req, res) => {
     }
 };
 
-const performUpdate = (id, updateFields, res) => {
-    User.findByIdAndUpdate(id, updateFields, { new: true })
-        .then((updatedUser) => {
+const performUpdate = async (id, updateFields) => {
+    try {
+        const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true });
             if (!updatedUser) {
-                return ({ message: "User not found" });
+            throw new Error("User not found");
             }
             return updatedUser;
-
-        })
-        .catch((err) => {
-            return ({
-                message: "Error in updating user",
-                error: err
-            });
-        })
+    } catch (err) {
+        throw err;
+    }
 };
 
 exports.getUser = async (req, res) => {
@@ -601,30 +597,30 @@ exports.createUser = async (req, res, next) => {
         if (req.body.course) userData.course = req.body.course;
         if (req.body.year) userData.year = req.body.year;
         if (req.body.section) userData.section = req.body.section;
-        
-        // Address fields
+
+            // Address fields
         if (req.body.houseNumber) userData.houseNumber = req.body.houseNumber;
         if (req.body.street) userData.street = req.body.street;
         if (req.body.barangay) userData.barangay = req.body.barangay;
         if (req.body.city) userData.city = req.body.city;
         if (req.body.province) userData.province = req.body.province;
-        
-        // Personal information
+
+            // Personal information
         if (req.body.sex) userData.sex = req.body.sex;
         if (req.body.birthDate) userData.birthDate = req.body.birthDate;
-        
-        // Educational background
+
+            // Educational background
         if (req.body.elementarySchool) userData.elementarySchool = req.body.elementarySchool;
         if (req.body.highSchool) userData.highSchool = req.body.highSchool;
         if (req.body.seniorHighSchool) userData.seniorHighSchool = req.body.seniorHighSchool;
         if (req.body.schoolAddress) userData.schoolAddress = req.body.schoolAddress;
-        
-        // Boolean flags
+
+            // Boolean flags
         if (req.body.isYouIndigenous !== undefined) userData.isYouIndigenous = req.body.isYouIndigenous;
         if (req.body.isDisabled !== undefined) userData.isDisabled = req.body.isDisabled;
         if (req.body.isFirstCollegeGraduate !== undefined) userData.isFirstCollegeGraduate = req.body.isFirstCollegeGraduate;
-        
-        // Status flags
+
+            // Status flags
         if (req.body.isRegular !== undefined) userData.isRegular = req.body.isRegular;
         if (req.body.isEmailSent !== undefined) userData.isEmailSent = req.body.isEmailSent;
         if (req.body.isArchived !== undefined) userData.isArchived = req.body.isArchived;
@@ -727,11 +723,15 @@ exports.resetQueueCounter = async (req, res, next) => {
             transferredQueue: 0,
         }
 
-        const updatedUser = performUpdate(userId, updateFields, res);
+        const updatedUser = await performUpdate(userId, updateFields);
         return res.status(200).json(updatedUser)
 
     } catch (error) {
         console.error('Error resetting queue:', error);
+        return res.status(500).json({
+            message: "Error resetting queue",
+            error: error.message || error,
+        });
     }
 };
 
@@ -748,13 +748,20 @@ exports.updateUser = async (req, res, next) => {
             const hashedPassword = await bcrypt.hash(updateFields.password, saltRounds);
             updateFields.password = hashedPassword;
         }
-        const updatedUser = performUpdate(userId, updateFields, res);
-        return res.status(200).json(updatedUser)
 
+        const updatedUser = await performUpdate(userId, updateFields);
+        console.log('User updated successfully:', updatedUser);
+        return res.status(200).json(updatedUser);
 
     }
     catch (error) {
         console.error('Error updating user:', error);
+        if (error.message === "User not found") {
+            return res.status(404).json({
+                message: "User not found",
+                error: error.message || error,
+            });
+        }
         return res.status(500).json({
             message: "Error in updating user",
             error: error.message || error,
@@ -955,7 +962,16 @@ exports.insertStudent_W = async (req, res) => {
                     const grade = parseFloat(row[key]);
 
                     if (isNaN(grade)) continue;
-                    if (grade === 0 || grade > 3) {
+                    
+                    // CVSU Grading System: 1=Perfect, 2=Good, 3=Pass, 4-5=Failed
+                    // Only accept valid CVSU grades (1-5)
+                    if (!isValidCVSUGrade(grade)) {
+                        console.log(`Invalid CVSU grade: ${grade} for student ${studentNumber}, course ${key}`);
+                        continue; // Skip invalid grades
+                    }
+                    
+                    // Check if grade is failing (4 or 5)
+                    if (isFailingGrade(grade)) {
                         hasInvalidGrade = true;
                     }
 
@@ -978,14 +994,19 @@ exports.insertStudent_W = async (req, res) => {
                     replyTo: process.env.EMAIL_USER,
                     to: email,
                     subject: "Grade Concern - Cavite State University",
-                    text: `Hi ${studentName},\n\nOne or more of your grades are either failing (above 3.0) or invalid (0). Please visit the university registrar to resolve this issue before enrollment.`,
-                    html: `<p>Hi <strong>${studentName}</strong>,</p><p>One or more of your grades are either <strong>failing (above 3.0)</strong> or <strong>invalid (0)</strong>. Please visit the university registrar to resolve this issue before enrollment.</p>`
+                    text: `Hi ${studentName},\n\nOne or more of your grades are failing (4.0 or 5.0). Please visit the university registrar to resolve this issue before enrollment.`,
+                    html: `<p>Hi <strong>${studentName}</strong>,</p><p>One or more of your grades are <strong>failing (4.0 or 5.0)</strong>. Please visit the university registrar to resolve this issue before enrollment.</p>`
                 };
 
                 await transporter.sendMail(mailOptions);
                 console.log(`Grade issue email sent to ${studentNumber}`);
 
                 const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
+
+                // Automatically determine isRegular based on grades
+                // If student has any failing grade (4 or 5), mark as irregular
+                // If all courses are passed (1, 2, or 3), mark as regular
+                const hasFailed = hasFailingGrades(courses);
 
                 const update = {
                     username: studentNumber,
@@ -999,7 +1020,7 @@ exports.insertStudent_W = async (req, res) => {
                     course: program,
                     year,
                     section,
-                    isRegular: isRegular === true || isRegular === 'true',
+                    isRegular: !hasFailed, // Regular if no failing grades
                     isArchived: isArchived === true || isArchived === 'true',
                     courses,  // Save courses and grades
                     isEmailSent: true,
@@ -1015,6 +1036,12 @@ exports.insertStudent_W = async (req, res) => {
             }
 
             //if grade is valid then proceed with regular enrollment 
+            // Automatically determine isRegular based on grades
+            // If student has any failing grade (4 or 5), mark as irregular
+            // If all courses are passed (1, 2, or 3), mark as regular
+            const hasFailed = hasFailingGrades(courses);
+            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailed}, will be marked as ${hasFailed ? 'Irregular' : 'Regular'}`);
+            
             const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
 
             const update = {
@@ -1029,7 +1056,7 @@ exports.insertStudent_W = async (req, res) => {
                 course: program,
                 year,
                 section,
-                isRegular: isRegular === true || isRegular === 'true',
+                isRegular: !hasFailed, // Regular if no failing grades, Irregular if has failing grades
                 isArchived: isArchived === true || isArchived === 'true',
                 courses
             };
@@ -1597,10 +1624,11 @@ exports.insertStudents = async (req, res) => {
             // Use the date parser instead of direct Date constructor
             user.birthDate = parseDateString(birthDate);
 
-            user.elemenarySchool = elemenarySchool;
-            user.highSchool = highSchool;
-            user.seniorHighSchool = seniorHighSchool;
-            user.schoolAddress = schoolAddress;
+            // Fix typo: elemenarySchool -> elementarySchool (preserve existing if empty)
+            user.elementarySchool = elemenarySchool || user.elementarySchool;
+            user.highSchool = highSchool || user.highSchool;
+            user.seniorHighSchool = seniorHighSchool || user.seniorHighSchool;
+            user.schoolAddress = schoolAddress || user.schoolAddress;
 
             // Use boolean converter for all boolean fields
             user.isYouIndigenous = toBoolean(isYouIndigenous);
@@ -1845,6 +1873,16 @@ exports.insertGradesByRow = async (req, res) => {
                 });
             }
 
+            // Automatically set isRegular based on grades
+            // If student has any failing grade (3.1-5.0), mark as irregular
+            // If all courses are passed (1.0-3.0), mark as regular
+            user.isRegular = !hasFailingGrades(user.courses);
+            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailingGrades(user.courses)}, isRegular: ${user.isRegular}`);
+
+            // Mark courses array as modified to ensure Mongoose saves it
+            user.markModified('courses');
+            
+            // Save user - this preserves all other existing fields
             const savedUser = await user.save();
             updatedUsers.push(savedUser);
         }
@@ -1894,6 +1932,12 @@ exports.insertTest = async (req, res) => {
 
             const grade = parseFloat(rawGrade);
 
+            // Validate CVSU grade (1-5)
+            if (!isValidCVSUGrade(grade)) {
+                console.log(`Invalid CVSU grade: ${grade} for student ${studentNumber}, course ${courseCode}`);
+                continue; // Skip invalid grades
+            }
+
             // Check if courseCode exists
             const course = await Course.findOne({ code: courseCode });
             if (!course) {
@@ -1929,6 +1973,12 @@ exports.insertTest = async (req, res) => {
                     year
                 });
             }
+
+            // Automatically set isRegular based on grades
+            // If student has any failing grade (4 or 5), mark as irregular
+            // If all courses are passed (1, 2, or 3), mark as regular
+            user.isRegular = !hasFailingGrades(user.courses);
+            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailingGrades(user.courses)}, isRegular: ${user.isRegular}`);
 
             const savedUser = await user.save();
             updatedUsers.push(savedUser);
