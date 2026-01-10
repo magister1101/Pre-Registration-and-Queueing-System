@@ -331,7 +331,7 @@ exports.getUser = async (req, res) => {
             searchCriteria = { $and: queryConditions };
         }
         const users = await User.find(searchCriteria)
-            .populate('courses.courseId', 'name code')
+            .populate('courses.courseId', 'name code unit course semester year')
             .populate({
                 path: 'courseToTake',
                 select: 'name code unit course semester description prerequisite',
@@ -741,6 +741,19 @@ exports.updateUser = async (req, res, next) => {
         const updateFields = req.body;
         console.log(updateFields);
 
+        // If studentNumber is being updated, also update username and password
+        if (updateFields.studentNumber) {
+            // Username should match studentNumber
+            updateFields.username = updateFields.studentNumber;
+            
+            // Password should also be set to studentNumber (will be hashed below)
+            // Only update password if it's not already being set explicitly
+            if (!updateFields.password) {
+                updateFields.password = updateFields.studentNumber;
+            }
+        }
+
+        // Hash password if provided
         if (updateFields.password) {
             const bcrypt = require('bcrypt');
             const saltRounds = 10;
