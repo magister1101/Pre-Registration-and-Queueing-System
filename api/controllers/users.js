@@ -1648,6 +1648,13 @@ exports.insertStudents = async (req, res) => {
             user.isDisabled = toBoolean(isDisabled);
             user.isFirstCollegeGraduate = toBoolean(isFirstCollegeGraduate);
             user.isArchived = toBoolean(isArchived);
+            
+            // Set isRegular to null initially (New Status) - will be determined when grades are imported
+            // Only set to null if student doesn't have courses yet (preserve existing status if grades already exist)
+            if (!user.courses || user.courses.length === 0) {
+                user.isRegular = null; // New status - not yet determined, will be set when grades are imported
+            }
+            // If user already has courses, keep existing isRegular status (don't overwrite)
 
             try {
                 const savedUser = await user.save();
@@ -1987,12 +1994,17 @@ exports.insertTest = async (req, res) => {
                 });
             }
 
-            // Automatically set isRegular based on grades
+            // Automatically determine isRegular based on grades after importing
             // If student has any failing grade (4 or 5), mark as irregular
             // If all courses are passed (1, 2, or 3), mark as regular
-            user.isRegular = !hasFailingGrades(user.courses);
-            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailingGrades(user.courses)}, isRegular: ${user.isRegular}`);
+            // This will update the "New" status to Regular/Irregular based on grades
+            const hasFailed = hasFailingGrades(user.courses);
+            user.isRegular = !hasFailed; // Regular if no failing grades, Irregular if has failing grades
+            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailed}, isRegular: ${user.isRegular}`);
 
+            // Mark courses array as modified to ensure Mongoose saves it
+            user.markModified('courses');
+            
             const savedUser = await user.save();
             updatedUsers.push(savedUser);
         }
