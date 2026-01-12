@@ -453,6 +453,56 @@ exports.deleteUser = async (req, res) => {
     }
 };
 
+exports.getUserById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Invalid user ID format." });
+        }
+
+        const user = await User.findById(id)
+            .populate('courses.courseId', 'name code unit course semester year')
+            .populate({
+                path: 'courseToTake',
+                select: 'name code unit course semester description prerequisite',
+                populate: {
+                    path: 'prerequisite',
+                    select: 'name code unit semester'
+                }
+            })
+            .populate({
+                path: 'courseToTakeRemoved',
+                select: 'name code unit course semester description prerequisite',
+                populate: {
+                    path: 'prerequisite',
+                    select: 'name code unit semester'
+                }
+            })
+            .populate('schedule', 'code section course day schedule')
+            .populate({
+                path: 'schedule',
+                select: 'code section course day schedule',
+                populate: {
+                    path: 'schedule',
+                    select: 'code section course schedule'
+                }
+            });
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        return res.status(200).json(user);
+    } catch (error) {
+        console.error('Error retrieving user:', error);
+        return res.status(500).json({
+            message: "Error in retrieving user",
+            error: error.message || error,
+        });
+    }
+};
+
 exports.myProfile = async (req, res) => {
     try {
         const user = await User.findOne({ _id: req.userData.userId })

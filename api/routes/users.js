@@ -22,6 +22,10 @@ router.get('/resetQueue', checkAuth, UsersController.resetQueueCounter);
 
 router.get('/getTransactionLogs', UsersController.getTransactionLogs);
 
+router.get('/test', UsersController.test);
+
+router.get('/:id', UsersController.getUserById);
+
 router.post('/create', UsersController.createUser);
 
 router.post('/update/:userId', UsersController.updateUser);
@@ -57,8 +61,6 @@ router.post('/clockIn', UsersController.clockIn);
 router.post('/clockOut', UsersController.clockOut);
 
 router.delete('/delete', UsersController.deleteUser);
-
-router.get('/test', UsersController.test)
 
 
 
