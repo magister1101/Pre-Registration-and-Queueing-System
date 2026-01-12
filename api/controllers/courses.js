@@ -798,21 +798,80 @@ exports.insertScheduleFromExcel = async (req, res) => {
         =============================== */
 
         // Collect all unique subject codes from Excel
-        const courseCodes = [...new Set(rows.map(r => r.code))];
+        const courseCodes = [...new Set(rows.map(r => r.code).filter(Boolean))];
         
         // Find all courses at once for better performance
         const courses = await Course.find({ code: { $in: courseCodes } });
         
-        // Create a map of course code to course ID for easy lookup
-        const courseMap = {};
-        const missingCourses = [];
+        // Check if Excel has a "program" column (case-insensitive)
+        const hasProgramColumn = excelHeaders.some(h => h.toLowerCase() === 'program');
         
-        for (const courseCode of courseCodes) {
-            const course = courses.find(c => c.code === courseCode);
-            if (course) {
-                courseMap[courseCode] = course._id;
-            } else {
-                missingCourses.push(courseCode);
+        // Group courses by code to check for duplicates
+        const coursesByCode = {};
+        for (const course of courses) {
+            if (!coursesByCode[course.code]) {
+                coursesByCode[course.code] = [];
+            }
+            coursesByCode[course.code].push(course);
+        }
+        
+        // Helper function to find course ID for a row
+        const findCourseId = (row) => {
+            const courseCode = row.code;
+            if (!courseCode) return null;
+            
+            const matchingCourses = coursesByCode[courseCode] || [];
+            
+            if (matchingCourses.length === 0) {
+                return null;
+            }
+            
+            // If only one course with this code, use it
+            if (matchingCourses.length === 1) {
+                return matchingCourses[0]._id;
+            }
+            
+            // Multiple courses with same code - need to match by program
+            let matchedCourse = null;
+            
+            if (hasProgramColumn && row.program) {
+                // Try to match by program column from Excel
+                matchedCourse = matchingCourses.find(c => 
+                    c.course && c.course.trim().toUpperCase() === String(row.program).trim().toUpperCase()
+                );
+            } else if (row.course) {
+                // Try to match by "course" column (might be program name)
+                matchedCourse = matchingCourses.find(c => 
+                    c.course && c.course.trim().toUpperCase() === String(row.course).trim().toUpperCase()
+                );
+            }
+            
+            if (matchedCourse) {
+                return matchedCourse._id;
+            }
+            
+            // If no match found, return null (will be handled as missing/ambiguous)
+            return null;
+        };
+        
+        // Check for missing and ambiguous courses
+        const missingCourses = [];
+        const ambiguousCourses = new Set();
+        
+        for (const row of rows) {
+            const courseCode = row.code;
+            if (!courseCode) continue;
+            
+            const courseId = findCourseId(row);
+            if (!courseId) {
+                const matchingCourses = coursesByCode[courseCode] || [];
+                if (matchingCourses.length === 0) {
+                    if (!missingCourses.includes(courseCode)) {
+                        missingCourses.push(courseCode);
+                    }
+                } else if (matchingCourses.length > 1) {
+                    ambiguousCourses.add(courseCode);
+                }
             }
         }
 
@@ -821,6 +880,21 @@ exports.insertScheduleFromExcel = async (req, res) => {
             return res.status(400).json({
                 message: "Some courses do not exist in the database",
                 missingCourses
+            });
+        }
+        
+        if (ambiguousCourses.size > 0 && !hasProgramColumn) {
+            const ambiguousList = Array.from(ambiguousCourses).map(code => {
+                const matchingCourses = coursesByCode[code] || [];
+                return {
+                    code: code,
+                    availablePrograms: matchingCourses.map(c => c.course).filter(Boolean)
+                };
+            });
+            console.log("Ambiguous courses (multiple programs found):", ambiguousList);
+            return res.status(400).json({
+                message: "Some course codes exist in multiple programs. Please add a 'program' column to your Excel file with values like 'BEE', 'BSIT', etc.",
+                ambiguousCourses: ambiguousList
             });
         }
 
@@ -833,17 +907,21 @@ exports.insertScheduleFromExcel = async (req, res) => {
         for (const row of rows) {
             const { code: courseCode, course: courseName, section, room, day, startTime, endTime } = row;
 
-            if (!courseName || !section || !room || !day || !startTime || !endTime) {
+            if (!courseCode || !section || !room || !day || !startTime || !endTime) {
                 console.log("Skipping invalid row:", row);
                 continue;
             }
 
-            // Get course ID from the map
-            const courseId = courseMap[courseCode];
+            // Find course ID using the helper function (considers program if available)
+            const courseId = findCourseId(row);
             if (!courseId) {
                 console.log(`Course ID not found for code: ${courseCode}`);
                 continue;
             }
+            
+            // Get the actual course to use its name
+            const actualCourse = courses.find(c => c._id.toString() === courseId.toString());
+            const displayCourseName = actualCourse ? actualCourse.name : courseName;
 
             // Find existing group for this course-section combination
             let group = scheduleGroups.find(g => 
@@ -855,7 +933,7 @@ exports.insertScheduleFromExcel = async (req, res) => {
                 group = {
                     courseId: courseId,
                     courseCode: courseCode,
-                    courseName: courseName,
+                    courseName: displayCourseName,
                     section: section,
                     scheduleItems: []
                 };
