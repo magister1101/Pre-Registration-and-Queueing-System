@@ -373,17 +373,26 @@ exports.createTransaction = async (req, res) => {
         const destination = req.body.destination;
         const subCategory = req.body.subCategory;
 
-        // Find and increment the counter
+        // Validate destination
+        if (!destinations.includes(destination)) {
+            return res.status(400).json({ message: 'Invalid destination' });
+        }
+
+        // Find and increment the counter for the specific destination
+        const counterName = `queueNumber-${destination}`;
         const counter = await Counter.findOneAndUpdate(
-            { name: 'queueNumber' },
+            { name: counterName },
             { $inc: { value: 1 } },
             { new: true, upsert: true }
         );
 
         const queueNumber = `${counter.value}`;
 
-        // Count waiting queues
-        const waitingQueues = await Queue.countDocuments({ status: 'Waiting' });
+        // Count waiting queues for this specific destination
+        const waitingQueues = await Queue.countDocuments({ 
+            status: 'Waiting',
+            destination: destination
+        });
 
         // Calculate estimated waiting time
         const estimatedTimePerQueue = 5;
