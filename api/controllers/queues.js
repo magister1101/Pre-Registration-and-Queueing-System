@@ -152,10 +152,15 @@ exports.checkPrerequisites = async (req, res) => {
             const missing = [];
 
             for (let prereqId of course.prerequisite) {
-                if (!passedCourseIds.includes(prereqId.toString())) {
-                    const prereqCourse = await Course.findById(prereqId);
-                    if (prereqCourse) {
-                        missing.push({ id: prereqCourse._id, name: prereqCourse.name });
+                const prereqIdStr = prereqId.toString();
+                // Check if passed
+                if (!passedCourseIds.includes(prereqIdStr)) {
+                    // Not passed. Check if it's being taken in this session
+                    if (!selectedCourses.includes(prereqIdStr)) {
+                        const prereqCourse = await Course.findById(prereqId);
+                        if (prereqCourse) {
+                            missing.push({ id: prereqCourse._id, name: prereqCourse.name });
+                        }
                     }
                 }
             }
@@ -389,7 +394,7 @@ exports.createTransaction = async (req, res) => {
         const queueNumber = `${counter.value}`;
 
         // Count waiting queues for this specific destination
-        const waitingQueues = await Queue.countDocuments({ 
+        const waitingQueues = await Queue.countDocuments({
             status: 'Waiting',
             destination: destination
         });
