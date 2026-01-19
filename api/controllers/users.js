@@ -815,12 +815,12 @@ exports.updateUser = async (req, res, next) => {
         const updatedUser = await performUpdate(userId, updateFields);
         console.log('User updated successfully:', updatedUser);
 
-        // If this is an enrollment with INC agreement, send notifications
+        // If this is an enrollment with INC agreement, send acknowledgement to student
         if (updateFields.incAgreement && updateFields.incPrerequisites) {
             const { incAgreementEmailTemplate, transporter } = require('../utils/email');
             const studentName = `${updatedUser.firstName} ${updatedUser.lastName}`;
 
-            // Email to student
+            // Email to student (Acknowledgement)
             const studentMail = {
                 from: process.env.EMAIL_USER,
                 to: updatedUser.email,
@@ -828,26 +828,6 @@ exports.updateUser = async (req, res, next) => {
                 html: incAgreementEmailTemplate(studentName, updateFields.incPrerequisites.map(p => p.courseName).join(', '), updateFields.incPrerequisites.map(p => p.prerequisiteName).join(', '))
             };
             transporter.sendMail(studentMail).catch(err => console.error("Error sending INC student email:", err));
-
-            // Email to registrar and adviser
-            // Using EMAIL_USER as a fallback for registrar/adviser if not specifically configured
-            const registrarEmail = process.env.REGISTRAR_EMAIL || process.env.EMAIL_USER;
-            const adviserEmail = process.env.ADVISER_EMAIL || process.env.EMAIL_USER;
-
-            const staffMail = {
-                from: process.env.EMAIL_USER,
-                to: [registrarEmail, adviserEmail],
-                subject: `INC Prerequisite Agreement - ${studentName}`,
-                html: `
-                    <h2>INC Prerequisite Agreement Acknowledged</h2>
-                    <p>Student: <strong>${studentName}</strong> (${updatedUser.studentNumber})</p>
-                    <p>The student has agreed to finish the following prerequisites within this year/semester:</p>
-                    <ul>
-                        ${updateFields.incPrerequisites.map(p => `<li>${p.prerequisiteName} (Prerequisite for ${p.courseName})</li>`).join('')}
-                    </ul>
-                `
-            };
-            transporter.sendMail(staffMail).catch(err => console.error("Error sending INC staff email:", err));
         }
 
         return res.status(200).json(updatedUser);
