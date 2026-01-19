@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const xlsx = require('xlsx');
 
 const { transporter, customEmailtemplate, generateEmailTemplate, generateEmailTemplateInvalidCredentials } = require('../utils/email');
-const { isValidCVSUGrade, isFailingGrade, getGradeDescription, hasFailingGrades } = require('../utils/cvsuGrading');
+const { isValidCVSUGrade, isFailingGrade, getGradeDescription, hasFailingGrades, hasIrregularGrades } = require('../utils/cvsuGrading');
 
 const User = require('../models/user');
 const Course = require('../models/course');
@@ -226,10 +226,10 @@ exports.sendEmailReject = async (req, res) => {
 const performUpdate = async (id, updateFields) => {
     try {
         const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true });
-            if (!updatedUser) {
+        if (!updatedUser) {
             throw new Error("User not found");
-            }
-            return updatedUser;
+        }
+        return updatedUser;
     } catch (err) {
         throw err;
     }
@@ -583,8 +583,8 @@ exports.createUser = async (req, res, next) => {
     try {
         // Validate required fields
         if (!req.body.username || !req.body.email) {
-            return res.status(400).json({ 
-                message: "Username and email are required" 
+            return res.status(400).json({
+                message: "Username and email are required"
             });
         }
 
@@ -601,10 +601,10 @@ exports.createUser = async (req, res, next) => {
             { username: req.body.username },
             { email: req.body.email }
         ];
-        
+
         // Only check studentNumber if it's provided and not a placeholder
-        if (req.body.studentNumber && 
-            req.body.studentNumber.trim() !== '' && 
+        if (req.body.studentNumber &&
+            req.body.studentNumber.trim() !== '' &&
             !req.body.studentNumber.startsWith('NON-STUDENT-')) {
             queryConditions.push({ studentNumber: req.body.studentNumber });
         }
@@ -635,7 +635,7 @@ exports.createUser = async (req, res, next) => {
         if (req.body.file) userData.file = req.body.file;
         if (req.body.group) userData.group = req.body.group;
         if (req.body.courses) userData.courses = req.body.courses;
-        
+
         // Handle studentNumber: if provided, use it; otherwise generate unique placeholder for non-student accounts
         if (req.body.studentNumber && req.body.studentNumber.trim() !== '') {
             userData.studentNumber = req.body.studentNumber;
@@ -648,29 +648,29 @@ exports.createUser = async (req, res, next) => {
         if (req.body.year) userData.year = req.body.year;
         if (req.body.section) userData.section = req.body.section;
 
-            // Address fields
+        // Address fields
         if (req.body.houseNumber) userData.houseNumber = req.body.houseNumber;
         if (req.body.street) userData.street = req.body.street;
         if (req.body.barangay) userData.barangay = req.body.barangay;
         if (req.body.city) userData.city = req.body.city;
         if (req.body.province) userData.province = req.body.province;
 
-            // Personal information
+        // Personal information
         if (req.body.sex) userData.sex = req.body.sex;
         if (req.body.birthDate) userData.birthDate = req.body.birthDate;
 
-            // Educational background
+        // Educational background
         if (req.body.elementarySchool) userData.elementarySchool = req.body.elementarySchool;
         if (req.body.highSchool) userData.highSchool = req.body.highSchool;
         if (req.body.seniorHighSchool) userData.seniorHighSchool = req.body.seniorHighSchool;
         if (req.body.schoolAddress) userData.schoolAddress = req.body.schoolAddress;
 
-            // Boolean flags
+        // Boolean flags
         if (req.body.isYouIndigenous !== undefined) userData.isYouIndigenous = req.body.isYouIndigenous;
         if (req.body.isDisabled !== undefined) userData.isDisabled = req.body.isDisabled;
         if (req.body.isFirstCollegeGraduate !== undefined) userData.isFirstCollegeGraduate = req.body.isFirstCollegeGraduate;
 
-            // Status flags
+        // Status flags
         if (req.body.isRegular !== undefined) userData.isRegular = req.body.isRegular;
         if (req.body.isEmailSent !== undefined) userData.isEmailSent = req.body.isEmailSent;
         if (req.body.isArchived !== undefined) userData.isArchived = req.body.isArchived;
@@ -795,7 +795,7 @@ exports.updateUser = async (req, res, next) => {
         if (updateFields.studentNumber) {
             // Username should match studentNumber
             updateFields.username = updateFields.studentNumber;
-            
+
             // Password should also be set to studentNumber (will be hashed below)
             // Only update password if it's not already being set explicitly
             if (!updateFields.password) {
@@ -814,6 +814,42 @@ exports.updateUser = async (req, res, next) => {
 
         const updatedUser = await performUpdate(userId, updateFields);
         console.log('User updated successfully:', updatedUser);
+
+        // If this is an enrollment with INC agreement, send notifications
+        if (updateFields.incAgreement && updateFields.incPrerequisites) {
+            const { incAgreementEmailTemplate, transporter } = require('../utils/email');
+            const studentName = `${updatedUser.firstName} ${updatedUser.lastName}`;
+
+            // Email to student
+            const studentMail = {
+                from: process.env.EMAIL_USER,
+                to: updatedUser.email,
+                subject: "Acknowledgement: INC Prerequisite Agreement",
+                html: incAgreementEmailTemplate(studentName, updateFields.incPrerequisites.map(p => p.courseName).join(', '), updateFields.incPrerequisites.map(p => p.prerequisiteName).join(', '))
+            };
+            transporter.sendMail(studentMail).catch(err => console.error("Error sending INC student email:", err));
+
+            // Email to registrar and adviser
+            // Using EMAIL_USER as a fallback for registrar/adviser if not specifically configured
+            const registrarEmail = process.env.REGISTRAR_EMAIL || process.env.EMAIL_USER;
+            const adviserEmail = process.env.ADVISER_EMAIL || process.env.EMAIL_USER;
+
+            const staffMail = {
+                from: process.env.EMAIL_USER,
+                to: [registrarEmail, adviserEmail],
+                subject: `INC Prerequisite Agreement - ${studentName}`,
+                html: `
+                    <h2>INC Prerequisite Agreement Acknowledged</h2>
+                    <p>Student: <strong>${studentName}</strong> (${updatedUser.studentNumber})</p>
+                    <p>The student has agreed to finish the following prerequisites within this year/semester:</p>
+                    <ul>
+                        ${updateFields.incPrerequisites.map(p => `<li>${p.prerequisiteName} (Prerequisite for ${p.courseName})</li>`).join('')}
+                    </ul>
+                `
+            };
+            transporter.sendMail(staffMail).catch(err => console.error("Error sending INC staff email:", err));
+        }
+
         return res.status(200).json(updatedUser);
 
     }
@@ -1025,14 +1061,14 @@ exports.insertStudent_W = async (req, res) => {
                     const grade = parseFloat(row[key]);
 
                     if (isNaN(grade)) continue;
-                    
+
                     // CVSU Grading System: 1=Perfect, 2=Good, 3=Pass, 4-5=Failed
                     // Only accept valid CVSU grades (1-5)
                     if (!isValidCVSUGrade(grade)) {
                         console.log(`Invalid CVSU grade: ${grade} for student ${studentNumber}, course ${key}`);
                         continue; // Skip invalid grades
                     }
-                    
+
                     // Check if grade is failing (4 or 5)
                     if (isFailingGrade(grade)) {
                         hasInvalidGrade = true;
@@ -1069,7 +1105,7 @@ exports.insertStudent_W = async (req, res) => {
                 // Automatically determine isRegular based on grades
                 // If student has any failing grade (4 or 5), mark as irregular
                 // If all courses are passed (1, 2, or 3), mark as regular
-                const hasFailed = hasFailingGrades(courses);
+                const hasIrregular = hasIrregularGrades(courses);
 
                 const update = {
                     username: studentNumber,
@@ -1083,7 +1119,7 @@ exports.insertStudent_W = async (req, res) => {
                     course: program,
                     year,
                     section,
-                    isRegular: !hasFailed, // Regular if no failing grades
+                    isRegular: !hasIrregular, // Regular if no irregular grades (passed only)
                     isArchived: isArchived === true || isArchived === 'true',
                     courses,  // Save courses and grades
                     isEmailSent: true,
@@ -1102,9 +1138,9 @@ exports.insertStudent_W = async (req, res) => {
             // Automatically determine isRegular based on grades
             // If student has any failing grade (4 or 5), mark as irregular
             // If all courses are passed (1, 2, or 3), mark as regular
-            const hasFailed = hasFailingGrades(courses);
-            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailed}, will be marked as ${hasFailed ? 'Irregular' : 'Regular'}`);
-            
+            const hasIrregular = hasIrregularGrades(courses);
+            console.log(`Student ${studentNumber} - Has irregular grades: ${hasIrregular}, will be marked as ${hasIrregular ? 'Irregular' : 'Regular'}`);
+
             const hashedPassword = await bcrypt.hash(String(studentNumber), 10);
 
             const update = {
@@ -1119,7 +1155,7 @@ exports.insertStudent_W = async (req, res) => {
                 course: program,
                 year,
                 section,
-                isRegular: !hasFailed, // Regular if no failing grades, Irregular if has failing grades
+                isRegular: !hasIrregular, // Regular if no failing grades, Irregular if has failing grades
                 isArchived: isArchived === true || isArchived === 'true',
                 courses
             };
@@ -1569,30 +1605,30 @@ exports.insertStudents = async (req, res) => {
         // Helper function to parse date strings
         const parseDateString = (dateStr) => {
             if (!dateStr) return null;
-            
+
             // Remove any extra spaces
             dateStr = String(dateStr).trim();
-            
+
             // Try ISO format first (YYYY-MM-DD)
             if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const date = new Date(dateStr);
                 if (!isNaN(date.getTime())) return date;
             }
-            
+
             // Try US format (MM/DD/YYYY)
             if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
                 const parts = dateStr.split('/');
                 const date = new Date(parts[2], parts[0] - 1, parts[1]);
                 if (!isNaN(date.getTime())) return date;
             }
-            
+
             // Try International format (DD/MM/YYYY)
             if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
                 const parts = dateStr.split('/');
                 const date = new Date(parts[2], parts[1] - 1, parts[0]);
                 if (!isNaN(date.getTime())) return date;
             }
-            
+
             // Try Excel serial number (if it's a number)
             const num = Number(dateStr);
             if (!isNaN(num) && num > 0) {
@@ -1601,7 +1637,7 @@ exports.insertStudents = async (req, res) => {
                 const date = new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000);
                 if (!isNaN(date.getTime())) return date;
             }
-            
+
             return null;
         };
 
@@ -1698,7 +1734,7 @@ exports.insertStudents = async (req, res) => {
             user.isDisabled = toBoolean(isDisabled);
             user.isFirstCollegeGraduate = toBoolean(isFirstCollegeGraduate);
             user.isArchived = toBoolean(isArchived);
-            
+
             // Set isRegular to null initially (New Status) - will be determined when grades are imported
             // Only set to null if student doesn't have courses yet (preserve existing status if grades already exist)
             if (!user.courses || user.courses.length === 0) {
@@ -1725,9 +1761,9 @@ exports.insertStudents = async (req, res) => {
 
     } catch (error) {
         console.error("Insert Student Info Error:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Internal Server Error",
-            details: error.message 
+            details: error.message
         });
     }
 };
@@ -1946,12 +1982,13 @@ exports.insertGradesByRow = async (req, res) => {
             // Automatically set isRegular based on grades
             // If student has any failing grade (3.1-5.0), mark as irregular
             // If all courses are passed (1.0-3.0), mark as regular
-            user.isRegular = !hasFailingGrades(user.courses);
-            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailingGrades(user.courses)}, isRegular: ${user.isRegular}`);
+            const hasIrregular = hasIrregularGrades(user.courses);
+            user.isRegular = !hasIrregular;
+            console.log(`Student ${studentNumber} - Has irregular grades: ${hasIrregular}, isRegular: ${user.isRegular}`);
 
             // Mark courses array as modified to ensure Mongoose saves it
             user.markModified('courses');
-            
+
             // Save user - this preserves all other existing fields
             const savedUser = await user.save();
             updatedUsers.push(savedUser);
@@ -2000,13 +2037,16 @@ exports.insertTest = async (req, res) => {
                 continue;
             }
 
-            const grade = parseFloat(rawGrade);
+            const rawValue = String(rawGrade || '').trim();
+            const numGrade = parseFloat(rawValue);
 
-            // Validate CVSU grade (1-5)
-            if (!isValidCVSUGrade(grade)) {
-                console.log(`Invalid CVSU grade: ${grade} for student ${studentNumber}, course ${courseCode}`);
+            // Validate CVSU grade (1-5 or status like INC)
+            if (!isValidCVSUGrade(rawValue)) {
+                console.log(`Invalid CVSU grade/status: ${rawValue} for student ${studentNumber}, course ${courseCode}`);
                 continue; // Skip invalid grades
             }
+
+            const gradeToStore = !isNaN(numGrade) ? numGrade : rawValue;
 
             // Check if courseCode exists
             const course = await Course.findOne({ code: courseCode });
@@ -2031,14 +2071,14 @@ exports.insertTest = async (req, res) => {
 
             if (existingCourse) {
                 // Update grade + sem + year
-                existingCourse.grade = grade;
+                existingCourse.grade = gradeToStore;
                 existingCourse.sem = sem;
                 existingCourse.year = year;
             } else {
                 // Add new course entry with sem/year
                 user.courses.push({
                     courseId: courseId,
-                    grade,
+                    grade: gradeToStore,
                     sem,
                     year
                 });
@@ -2048,13 +2088,13 @@ exports.insertTest = async (req, res) => {
             // If student has any failing grade (4 or 5), mark as irregular
             // If all courses are passed (1, 2, or 3), mark as regular
             // This will update the "New" status to Regular/Irregular based on grades
-            const hasFailed = hasFailingGrades(user.courses);
-            user.isRegular = !hasFailed; // Regular if no failing grades, Irregular if has failing grades
-            console.log(`Student ${studentNumber} - Has failing grades: ${hasFailed}, isRegular: ${user.isRegular}`);
+            const hasIrregular = hasIrregularGrades(user.courses);
+            user.isRegular = !hasIrregular; // Regular if no irregular grades (INC/Failed/Dropped), Irregular otherwise
+            console.log(`Student ${studentNumber} - Has irregular grades: ${hasIrregular}, isRegular: ${user.isRegular}`);
 
             // Mark courses array as modified to ensure Mongoose saves it
             user.markModified('courses');
-            
+
             const savedUser = await user.save();
             updatedUsers.push(savedUser);
         }

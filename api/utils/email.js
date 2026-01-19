@@ -103,6 +103,20 @@ const generateEmailTemplateInvalidCredentials = (studentName) => {
     `;
 };
 
+const incAgreementEmailTemplate = (studentName, courseName, prerequisiteName) => {
+    return `
+        <h2>INC Prerequisite Agreement Acknowledgement</h2>
+        <p>Dear ${studentName},</p>
+        <p>This email serves as an acknowledgement of your agreement regarding the course <strong>${courseName}</strong>.</p>
+        <p>Since you have an <strong>Incomplete (INC)</strong> grade in the prerequisite course <strong>${prerequisiteName}</strong>, you have agreed to complete the requirements for <strong>${prerequisiteName}</strong> within this year/semester while taking <strong>${courseName}</strong>.</p>
+        <p>A copy of this acknowledgement has been sent to your adviser and the registrar's office.</p>
+        <br>
+        <p>Best regards,</p>
+        <p><strong>Office of the Registrar</strong></p>
+        <p>Cavite State University - Tanza Campus</p>
+    `;
+};
+
 // Export Transporter & Template
 module.exports = {
     transporter,
@@ -110,5 +124,6 @@ module.exports = {
     generateEmailTemplateInvalidCredentials,
     customEmailtemplate,
     queueEmailTemplate,
-    queueEmailRejectTemplate
+    queueEmailRejectTemplate,
+    incAgreementEmailTemplate
 };

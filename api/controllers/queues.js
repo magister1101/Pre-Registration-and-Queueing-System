@@ -107,6 +107,8 @@ exports.getQueues = async (req, res) => {
     }
 };
 
+const { isFailingGrade, isINC } = require('../utils/cvsuGrading');
+
 exports.checkPrerequisites = async (req, res) => {
     try {
         const { selectedCourses, destination, studentId } = req.body;
@@ -122,23 +124,30 @@ exports.checkPrerequisites = async (req, res) => {
 
         const studentCourses = student.courses || [];
         const passedCourseIds = studentCourses
-            .filter(c => c.grade <= 3 && c.grade !== 0)
-            .map(c => c.courseId);
-        const allCourseGrades = {};
-        studentCourses.forEach(c => {
-            allCourseGrades[c.courseId.toString()] = c.grade;
-        });
+            .filter(c => {
+                const numGrade = parseFloat(c.grade);
+                return !isNaN(numGrade) && numGrade <= 3.0 && numGrade !== 0;
+            })
+            .map(c => c.courseId.toString());
+
+        const incCourseIds = studentCourses
+            .filter(c => isINC(c.grade))
+            .map(c => c.courseId.toString());
+
+        const failedCourseIds = studentCourses
+            .filter(c => isFailingGrade(c.grade))
+            .map(c => c.courseId.toString());
 
         let missingPrerequisites = {};
-        let metCourses = [];
+        let incPrerequisites = {};
         let alreadyTakenCourses = [];
 
         for (let courseId of selectedCourses) {
             if (!mongoose.Types.ObjectId.isValid(courseId)) continue;
+            const courseIdStr = courseId.toString();
 
-            const courseGrade = allCourseGrades[courseId];
-            if (courseGrade && courseGrade <= 3 && courseGrade !== 0) {
-                // Already passed the course, block it
+            // Check if already passed
+            if (passedCourseIds.includes(courseIdStr)) {
                 const takenCourse = await Course.findById(courseId);
                 if (takenCourse) {
                     alreadyTakenCourses.push({ id: takenCourse._id, name: takenCourse.name });
@@ -150,32 +159,43 @@ exports.checkPrerequisites = async (req, res) => {
             if (!course) continue;
 
             const missing = [];
+            const incFound = [];
 
             for (let prereqId of course.prerequisite) {
                 const prereqIdStr = prereqId.toString();
-                // Check if passed
-                if (!passedCourseIds.includes(prereqIdStr)) {
-                    // Not passed. Check if it's being taken in this session
-                    if (!selectedCourses.includes(prereqIdStr)) {
-                        const prereqCourse = await Course.findById(prereqId);
-                        if (prereqCourse) {
-                            missing.push({ id: prereqCourse._id, name: prereqCourse.name });
-                        }
+
+                if (passedCourseIds.includes(prereqIdStr)) {
+                    continue; // Passed
+                }
+
+                if (selectedCourses.includes(prereqIdStr)) {
+                    continue; // Being taken now (concurrent)
+                }
+
+                if (incCourseIds.includes(prereqIdStr)) {
+                    const prereqCourse = await Course.findById(prereqId);
+                    if (prereqCourse) {
+                        incFound.push({ id: prereqCourse._id, name: prereqCourse.name });
+                    }
+                } else {
+                    const prereqCourse = await Course.findById(prereqId);
+                    if (prereqCourse) {
+                        missing.push({ id: prereqCourse._id, name: prereqCourse.name });
                     }
                 }
             }
 
             if (missing.length > 0) {
                 missingPrerequisites[course.name] = missing;
-            } else {
-                metCourses.push({ id: course._id, name: course.name });
+            } else if (incFound.length > 0) {
+                incPrerequisites[course.name] = incFound;
             }
         }
 
         if (alreadyTakenCourses.length > 0) {
             return res.status(200).json({
                 missing: true,
-                message: 'Some courses have already been passed and cannot be retaken.',
+                message: 'Some courses have already been passed.',
                 alreadyTakenCourses
             });
         }
@@ -188,21 +208,26 @@ exports.checkPrerequisites = async (req, res) => {
             });
         }
 
+        if (Object.keys(incPrerequisites).length > 0) {
+            return res.status(200).json({
+                missing: false,
+                needsAgreement: true,
+                message: 'Some prerequisites have Incomplete (INC) grades. You can take the next course but must agree to finish the prerequisite.',
+                incPrerequisites
+            });
+        }
+
         const updatedUser = await User.findByIdAndUpdate(
             studentId,
             { courseToTake: selectedCourses },
             { new: true }
         );
 
-        if (!updatedUser) {
-            return res.status(404).json({ message: "User not found during update." });
-        }
-
         return res.status(200).json({
             missing: false,
             message: 'All prerequisites met.',
             studentId,
-            selectedCourses: metCourses,
+            selectedCourses: selectedCourses,
             destination
         });
     } catch (error) {

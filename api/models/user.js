@@ -14,7 +14,7 @@ const userSchema = mongoose.Schema({
     role: { type: String, required: true, default: "student" }, //student, instructor, admin
     group: { type: String }, //if instructor this is the department
 
-    courses: [{ courseId: { type: String, ref: 'Course' }, grade: { type: Number }, sem:{type: String}, year: {type: String} }], //if student this is the courses taken
+    courses: [{ courseId: { type: String, ref: 'Course' }, grade: { type: mongoose.Schema.Types.Mixed }, sem: { type: String }, year: { type: String } }], //if student this is the courses taken
     courseToTake: [{ type: String, ref: 'Course' }], //if student this is the courses to take
     courseToTakeRemoved: [{ type: String, ref: 'Course' }],
 
@@ -56,6 +56,13 @@ const userSchema = mongoose.Schema({
 
     isEmailSent: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
+
+    incAgreement: { type: Boolean, default: false },
+    incPrerequisites: [{
+        courseName: { type: String },
+        prerequisiteName: { type: String }
+    }],
+
     createdAt: { type: Date, default: Date.now },
 });
 
